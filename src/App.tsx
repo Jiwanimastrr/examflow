@@ -16,6 +16,8 @@ function App() {
   const [examDates, setExamDates] = useState<SchoolExamDate[]>([]);
   const [showExamDateModal, setShowExamDateModal] = useState(false);
   const [showLoginHistoryModal, setShowLoginHistoryModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
@@ -180,6 +182,29 @@ function App() {
     }
   };
 
+  const handleResetAll = async () => {
+    if (resetConfirmText !== '전체 리셋 하겠습니다') {
+      alert("입력한 문구가 일치하지 않습니다.");
+      return;
+    }
+
+    try {
+      // Loop through all students and reset their progress
+      const promises = students.map(student => 
+        updateDoc(doc(db, 'students', student.id), { progress: {} })
+      );
+      await Promise.all(promises);
+
+      logActivity(currentUser, '전체 학생 진행도 리셋');
+      setShowResetModal(false);
+      setResetConfirmText('');
+      alert("모든 학생의 진행도가 성공적으로 초기화되었습니다.");
+    } catch (error) {
+      console.error("Error resetting all progress:", error);
+      alert("초기화 중 오류가 발생했습니다.");
+    }
+  };
+
   const calculateDDay = (school: string) => {
     const examDate = examDates.find(d => d.school === school);
     if (!examDate || !examDate.startDateStr || !examDate.endDateStr) return null;
@@ -256,7 +281,7 @@ function App() {
     <div className="container fade-in">
       <header className="flex-col items-center justify-center gap-3" style={{ marginBottom: '2.5rem', textAlign: 'center', position: 'relative' }}>
         <img src="/윌그로우로고.png" alt="윌그로우 로고" style={{ height: '50px', marginBottom: '0.5rem', objectFit: 'contain' }} />
-        <h1 className="title">이그잼포유 내신대비</h1>
+        <h1 className="title">내신 대비 마스터</h1>
         <p className="subtitle">학생 진행도 트래커</p>
         
         <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
@@ -275,12 +300,18 @@ function App() {
             최근 활동 기록 보기
           </button>
         </div>
-        <div style={{ position: 'absolute', top: 0, left: 0 }}>
-             <button 
+        <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+           <button 
              onClick={() => setShowExamDateModal(true)} 
              className="btn" 
              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
             학교별 시험일 설정
+          </button>
+          <button 
+             onClick={() => setShowResetModal(true)} 
+             className="btn btn-danger" 
+             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+            진행도 전체 리셋
           </button>
         </div>
       </header>
@@ -496,6 +527,53 @@ function App() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset All Modal */}
+      {showResetModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
+          <div className="card fade-in" style={{ width: '400px', textAlign: 'center' }}>
+            <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--accent-red)' }}>⚠️ 전체 진행도 리셋</h2>
+            <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+              모든 학생의 체크리스트 진행 상황이 <strong>0%로 완전히 초기화</strong>됩니다.<br />
+              학생 명단은 삭제되지 않습니다.<br />
+              이 작업은 되돌릴 수 없습니다.
+            </p>
+            <p style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              정말 초기화하시려면 아래 문구를 똑같이 입력해주세요:
+            </p>
+            <p style={{ marginBottom: '1rem', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '4px', userSelect: 'none' }}>
+              전체 리셋 하겠습니다
+            </p>
+            <input 
+              type="text"
+              className="input"
+              style={{ width: '100%', textAlign: 'center', marginBottom: '1.5rem' }}
+              placeholder="위 문구를 입력하세요"
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button 
+                className="btn btn-danger"
+                onClick={handleResetAll}
+                disabled={resetConfirmText !== '전체 리셋 하겠습니다'}
+                style={{ opacity: resetConfirmText !== '전체 리셋 하겠습니다' ? 0.5 : 1 }}
+              >
+                초기화 실행
+              </button>
+              <button 
+                className="btn"
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetConfirmText('');
+                }}
+              >
+                취소
+              </button>
             </div>
           </div>
         </div>
