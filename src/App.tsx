@@ -206,7 +206,11 @@ function App() {
     const total = ALL_CHECKLIST_ITEMS.length;
     let completed = 0;
     ALL_CHECKLIST_ITEMS.forEach(item => {
-      if (student.progress && student.progress[item.id]?.isChecked) completed++;
+      const progressData = student.progress && student.progress[item.id];
+      const isLegacyBoolean = typeof progressData === 'boolean';
+      // @ts-ignore - Handle legacy boolean format
+      const isChecked = isLegacyBoolean ? progressData : (progressData?.isChecked ?? false);
+      if (isChecked) completed++;
     });
     return total === 0 ? 0 : Math.round((completed / total) * 100);
   };
@@ -585,7 +589,7 @@ function App() {
             {/* Bottom 3 */}
             <div style={{ flex: 1, minWidth: '250px', backgroundColor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.2)', borderRadius: '12px', padding: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', color: '#c62828', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                🚨 달성율 분발 요망 BOTTOM 3
+                🚨 달성율 HURRY UP BOTTOM 3
               </h3>
               <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
                 {bottom3Students.map((s) => (
@@ -653,10 +657,19 @@ function App() {
                       </td>
                       {ALL_CHECKLIST_ITEMS.map(item => {
                         const progressState = student.progress && student.progress[item.id];
-                        const isChecked = progressState?.isChecked ?? false;
-                        const tooltip = isChecked && progressState 
-                          ? `체크: ${progressState.updatedBy}\n일시: ${formatDate(progressState.updatedAt || 0)}` 
-                          : `${student.name} - ${item.label}`;
+                        const isLegacyBoolean = typeof progressState === 'boolean';
+                        // @ts-ignore
+                        const isChecked = isLegacyBoolean ? progressState : (progressState?.isChecked ?? false);
+                        
+                        let tooltip = `${student.name} - ${item.label}`;
+                        if (isChecked) {
+                          if (isLegacyBoolean) {
+                            tooltip = `${student.name} - ${item.label} (선생님/시간 기록 없음)`;
+                          } else if (progressState) {
+                            // @ts-ignore
+                            tooltip = `체크: ${progressState.updatedBy}\n일시: ${formatDate(progressState.updatedAt || 0)}`;
+                          }
+                        }
                           
                         return (
                           <td key={item.id}>
