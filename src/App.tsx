@@ -18,6 +18,8 @@ function App() {
   const [showLoginHistoryModal, setShowLoginHistoryModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
   
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
@@ -205,6 +207,29 @@ function App() {
     }
   };
 
+  const handleDeleteAllStudents = async () => {
+    if (deleteAllConfirmText !== '학생 전체 삭제 하겠습니다') {
+      alert("입력한 문구가 일치하지 않습니다.");
+      return;
+    }
+
+    try {
+      // Loop through all students and delete their documents using Firebase deleteDoc
+      const promises = students.map(student => 
+        deleteDoc(doc(db, 'students', student.id))
+      );
+      await Promise.all(promises);
+
+      logActivity(currentUser, '모든 학생 데이터 영구 삭제');
+      setShowDeleteAllModal(false);
+      setDeleteAllConfirmText('');
+      alert("모든 학생 데이터가 성공적으로 삭제되었습니다.");
+    } catch (error) {
+      console.error("Error deleting all students:", error);
+      alert("삭제 중 오류가 발생했습니다.");
+    }
+  };
+
   const calculateDDay = (school: string) => {
     const examDate = examDates.find(d => d.school === school);
     if (!examDate || !examDate.startDateStr || !examDate.endDateStr) return null;
@@ -307,12 +332,20 @@ function App() {
              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
             학교별 시험일 설정
           </button>
-          <button 
-             onClick={() => setShowResetModal(true)} 
-             className="btn btn-danger" 
-             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-            진행도 전체 리셋
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+               onClick={() => setShowResetModal(true)} 
+               className="btn" 
+               style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba' }}>
+              진행도 전체 리셋
+            </button>
+            <button 
+               onClick={() => setShowDeleteAllModal(true)} 
+               className="btn btn-danger" 
+               style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+              학생 전체 삭제
+            </button>
+          </div>
         </div>
       </header>
 
@@ -570,6 +603,53 @@ function App() {
                 onClick={() => {
                   setShowResetModal(false);
                   setResetConfirmText('');
+                }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Students Modal */}
+      {showDeleteAllModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
+          <div className="card fade-in" style={{ width: '400px', textAlign: 'center' }}>
+            <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--accent-red)' }}>🚨 학생 전체 영구 삭제</h2>
+            <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+              등록된 <strong>모든 학생 데이터가 데이터베이스에서 영구히 삭제</strong>됩니다.<br />
+              진행 상황을 포함한 모든 기록이 지워지며,<br />
+              이 작업은 절대로 되돌릴 수 없습니다.
+            </p>
+            <p style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              정말 모두 삭제하시려면 아래 문구를 똑같이 입력해주세요:
+            </p>
+            <p style={{ marginBottom: '1rem', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '4px', userSelect: 'none' }}>
+              학생 전체 삭제 하겠습니다
+            </p>
+            <input 
+              type="text"
+              className="input"
+              style={{ width: '100%', textAlign: 'center', marginBottom: '1.5rem', border: '1px solid var(--accent-red)' }}
+              placeholder="위 문구를 입력하세요"
+              value={deleteAllConfirmText}
+              onChange={(e) => setDeleteAllConfirmText(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button 
+                className="btn btn-danger"
+                onClick={handleDeleteAllStudents}
+                disabled={deleteAllConfirmText !== '학생 전체 삭제 하겠습니다'}
+                style={{ opacity: deleteAllConfirmText !== '학생 전체 삭제 하겠습니다' ? 0.5 : 1 }}
+              >
+                영구 삭제 실행
+              </button>
+              <button 
+                className="btn"
+                onClick={() => {
+                  setShowDeleteAllModal(false);
+                  setDeleteAllConfirmText('');
                 }}
               >
                 취소
