@@ -303,6 +303,21 @@ function App() {
     return matchesSearch && matchesSchool && matchesGrade;
   });
 
+  const studentsWithProgress = students.map(student => ({
+    ...student,
+    progressPct: calculateStudentProgress(student)
+  }));
+  
+  // Exclude students with 0% from bottom if they just started? Or keep it literal? 
+  // Let's keep it literal and just sort. To resolve ties it's stable enough.
+  const sortedByProgressDesc = [...studentsWithProgress].sort((a, b) => b.progressPct - a.progressPct);
+  const top3Students = sortedByProgressDesc.slice(0, 3);
+  
+  // To avoid showing the exact same top 3 in bottom 3 if there are very few students,
+  // we can just reverse, but normally we just take the last 3 or sort ascending.
+  const sortedByProgressAsc = [...studentsWithProgress].sort((a, b) => a.progressPct - b.progressPct);
+  const bottom3Students = sortedByProgressAsc.slice(0, 3);
+
   return (
     <div className="container fade-in">
       <header className="flex-col items-center justify-center gap-3" style={{ marginBottom: '2.5rem', textAlign: 'center', position: 'relative' }}>
@@ -411,6 +426,39 @@ function App() {
             ))}
           </select>
         </div>
+
+        {/* Ranking Dashboard */}
+        {students.length > 0 && (
+          <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+            {/* Top 3 */}
+            <div style={{ flex: 1, minWidth: '250px', backgroundColor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: '12px', padding: '1rem' }}>
+              <h3 style={{ fontSize: '1.05rem', color: '#2e7d32', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                🏆 달성율 RANK TOP 3
+              </h3>
+              <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                {top3Students.map((s) => (
+                  <li key={s.id}>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#2e7d32' }}>{s.progressPct}%</strong>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            
+            {/* Bottom 3 */}
+            <div style={{ flex: 1, minWidth: '250px', backgroundColor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.2)', borderRadius: '12px', padding: '1rem' }}>
+              <h3 style={{ fontSize: '1.05rem', color: '#c62828', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                🚨 달성율 분발 요망 BOTTOM 3
+              </h3>
+              <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                {bottom3Students.map((s) => (
+                  <li key={s.id}>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#c62828' }}>{s.progressPct}%</strong>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        )}
 
         <div className="tracker-container">
           <table className="tracker-table">
