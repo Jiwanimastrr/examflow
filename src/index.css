@@ -251,6 +251,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Glass Table Container */
 .tracker-container {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px; /* Enable vertical scroll inside container */
   border-radius: var(--radius-xl);
   background: var(--bg-secondary);
   box-shadow: var(--shadow-elevated);
@@ -313,16 +315,20 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: var(--backdrop-blur);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 10; /* Make headers sit above the body rows */
   letter-spacing: 0.02em;
   text-transform: uppercase;
   border-right: 1px solid rgba(0,0,0,0.1);
   border-bottom: 1px solid rgba(0,0,0,0.1);
 }
 
+.tracker-table thead tr:nth-child(2) th {
+  top: 41px; /* Offset by the height of the first row headers to stack them */
+}
+
 .tracker-table th.student-name-col {
   left: 0;
-  z-index: 20;
+  z-index: 20; /* Highest priority: Top Left Corner should stay fixed in both x and y */
   min-width: 140px;
   text-align: left;
   padding-left: 1.5rem;
