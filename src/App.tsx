@@ -252,6 +252,35 @@ function App() {
     }
   };
 
+  const handleManualSync = async () => {
+    try {
+      console.log('수동 동기화 시작...');
+      const promises: Promise<void>[] = [];
+      
+      // Sync all students
+      students.forEach(student => {
+        promises.push(setDoc(doc(db, 'students', student.id), student));
+      });
+      // Sync all exam dates
+      examDates.forEach(dateReq => {
+        promises.push(setDoc(doc(db, 'exam_dates', `${dateReq.school}_${dateReq.grade}`), dateReq));
+      });
+      
+      await Promise.all(promises);
+      console.log('수동 동기화 완료');
+    } catch (error) {
+      console.error("수동 동기화 실패:", error);
+      alert("동기화 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleLogout = async () => {
+    await handleManualSync();
+    logActivity(currentUser, '전체 데이터 동기화 및 로그아웃');
+    alert("모든 데이터가 안전하게 서버에 동기화(저장)되었습니다. 로그아웃합니다.");
+    setCurrentUser('');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -472,8 +501,11 @@ function App() {
             <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               접속자: <strong>{currentUser}</strong>
             </span>
-            <button onClick={() => setCurrentUser('')} className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-              변경
+            <button onClick={handleManualSync} className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--accent-blue)', color: 'var(--accent-blue)' }}>
+              수동 동기화
+            </button>
+            <button onClick={handleLogout} className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+              로그아웃
             </button>
           </div>
           <button 
