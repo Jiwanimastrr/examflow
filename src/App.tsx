@@ -211,6 +211,43 @@ function App() {
     return total === 0 ? 0 : Math.round((completed / total) * 100);
   };
 
+  const migrateLocalDataToFirebase = async (userName: string) => {
+    try {
+      const LOCAL_STORAGE_KEY = 'exam-tracker-students';
+      const MIGRATED_KEY = 'exam-tracker-migrated-to-firebase';
+      
+      if (localStorage.getItem(MIGRATED_KEY)) return; // Already migrated
+
+      const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log(`기존 로컬 데이터 ${parsed.length}명 파이어베이스로 마이그레이션 시작...`);
+          
+          const promises = parsed.map(async (student) => {
+            if (!student.id || !student.name) return;
+            const cleanStudent: Student = {
+              id: student.id,
+              name: student.name,
+              school: student.school || '전체',
+              grade: student.grade || '전체',
+              progress: student.progress || {},
+              comments: student.comments || []
+            };
+            return setDoc(doc(db, 'students', cleanStudent.id), cleanStudent);
+          });
+          
+          await Promise.all(promises);
+          localStorage.setItem(MIGRATED_KEY, 'true');
+          alert(`🎉 예전에 브라우저에 저장하셨던 ${parsed.length}명의 학생 데이터가 서버로 성공적으로 복구(연동)되었습니다!`);
+          logActivity(userName, '기존 로컬 데이터 파이어베이스로 이전 시스템 완료');
+        }
+      }
+    } catch (error) {
+      console.error("Migration failed:", error);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -226,6 +263,9 @@ function App() {
       
       // Log history to Firestore
       logActivity(capitalizedName, '로그인');
+      
+      // Automatically migrate old LocalStorage data if it exists and hasn't been migrated yet.
+      migrateLocalDataToFirebase(capitalizedName);
     } else {
       setLoginError('이름을 입력해주세요.');
     }
