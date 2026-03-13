@@ -12,12 +12,20 @@ export interface StudentProgress {
   updatedAt?: number;
 }
 
+export interface StudentComment {
+  id: string;
+  text: string;
+  author: string;
+  timestamp: number;
+}
+
 export interface Student {
   id: string;
   name: string;
   school: string;
   grade: string;
   progress: Record<string, StudentProgress>;
+  comments?: StudentComment[];
 }
 
 export interface LoginRecord {

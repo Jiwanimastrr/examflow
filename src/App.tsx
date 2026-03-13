@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Student, LoginRecord, SchoolExamDate } from './types';
+import type { Student, LoginRecord, SchoolExamDate, StudentComment } from './types';
 import { CHECKLIST_CATEGORIES, ALL_CHECKLIST_ITEMS, SCHOOLS, GRADES } from './types';
 import './index.css';
 
@@ -81,6 +81,9 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSchool, setFilterSchool] = useState(SCHOOLS[0]); // default '전체'
   const [filterGrade, setFilterGrade] = useState(GRADES[0]); // default '전체'
+
+  const [selectedStudentIdForComments, setSelectedStudentIdForComments] = useState<string | null>(null);
+  const [newCommentText, setNewCommentText] = useState('');
 
   // Firestore realtime listeners
   useEffect(() => {
@@ -280,6 +283,34 @@ function App() {
     } catch (error) {
       console.error("Error deleting all students:", error);
       alert("삭제 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCommentText.trim() || !selectedStudentIdForComments) return;
+
+    const studentToComment = students.find(s => s.id === selectedStudentIdForComments);
+    if (!studentToComment) return;
+
+    const newComment: StudentComment = {
+      id: crypto.randomUUID(),
+      text: newCommentText.trim(),
+      author: currentUser,
+      timestamp: Date.now()
+    };
+
+    try {
+      const studentRef = doc(db, 'students', selectedStudentIdForComments);
+      const currentComments = studentToComment.comments || [];
+      await updateDoc(studentRef, {
+        comments: [...currentComments, newComment]
+      });
+      setNewCommentText('');
+      logActivity(currentUser, `학생 '${studentToComment.name}'에 코멘트 추가`);
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      alert("코멘트 추가 중 오류가 발생했습니다.");
     }
   };
 
@@ -562,9 +593,14 @@ function App() {
                     <tr key={student.id}>
                       <td className="student-name-col">
                         <div className="flex flex-col gap-1">
-                          <span style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {student.name}
-                            {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white' }}>{dDayText}</span>}
+                          <span 
+                            style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
+                            onClick={() => setSelectedStudentIdForComments(student.id)}
+                            title="클릭하여 학생 코멘트 보기"
+                          >
+                            <span style={{ textDecoration: 'underline', color: 'var(--text-primary)' }}>{student.name}</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--accent-blue)' }}>💬</span>
+                            {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white', cursor: 'default' }}>{dDayText}</span>}
                           </span>
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                             {student.school} {student.grade} • {progressPct}% 달성
@@ -787,6 +823,54 @@ function App() {
                 취소
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Student Comments Modal */}
+      {selectedStudentIdForComments && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
+          <div className="card fade-in" style={{ width: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>
+                {students.find(s => s.id === selectedStudentIdForComments)?.name} 선생님 코멘트 💬
+              </h2>
+              <button onClick={() => {
+                setSelectedStudentIdForComments(null);
+                setNewCommentText('');
+              }} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingRight: '0.5rem' }}>
+              {(() => {
+                const s = students.find(st => st.id === selectedStudentIdForComments);
+                const comments = s?.comments || [];
+                if (comments.length === 0) {
+                  return <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>아직 등록된 코멘트가 없습니다.</p>;
+                }
+                return comments.map(c => (
+                  <div key={c.id} style={{ padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: '500', color: 'var(--accent-blue)', fontSize: '0.9rem' }}>{c.author} 선생님</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{formatDate(c.timestamp)}</span>
+                    </div>
+                    <p style={{ margin: 0, color: 'var(--text-primary)', fontSize: '0.95rem', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{c.text}</p>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+              <input 
+                type="text" 
+                className="input" 
+                style={{ flex: 1 }} 
+                placeholder="새로운 코멘트 입력..." 
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+              />
+              <button type="submit" className="btn btn-primary" disabled={!newCommentText.trim()}>등록</button>
+            </form>
           </div>
         </div>
       )}
