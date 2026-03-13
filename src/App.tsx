@@ -16,6 +16,7 @@ function App() {
   const [examDates, setExamDates] = useState<SchoolExamDate[]>([]);
   const [showExamDateModal, setShowExamDateModal] = useState(false);
   const [showLoginHistoryModal, setShowLoginHistoryModal] = useState(false);
+  const [selectedHistoryTeacher, setSelectedHistoryTeacher] = useState<string | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -501,17 +502,40 @@ function App() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
           <div className="card fade-in" style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>최근 접속 및 활동 기록</h2>
-              <button onClick={() => setShowLoginHistoryModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
+              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>
+                {selectedHistoryTeacher ? `'${selectedHistoryTeacher}' 선생님 활동 내역` : '최근 접속 및 활동 기록'}
+              </h2>
+              <div>
+                {selectedHistoryTeacher && (
+                  <button onClick={() => setSelectedHistoryTeacher(null)} className="btn" style={{ padding: '0.3rem 0.6rem', marginRight: '0.5rem', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>뒤로</button>
+                )}
+                <button onClick={() => {
+                  setShowLoginHistoryModal(false);
+                  setSelectedHistoryTeacher(null);
+                }} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
+              </div>
             </div>
             {loginHistory.length === 0 ? (
               <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>기록이 없습니다.</p>
             ) : (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {loginHistory.slice(0, 30).map((record, idx) => (
+                {(selectedHistoryTeacher ? loginHistory.filter(r => r.name === selectedHistoryTeacher) : loginHistory).slice(0, 30).map((record, idx) => (
                   <li key={record.id || idx} style={{ padding: '0.8rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontWeight: '500' }}>{record.name} <span style={{ fontWeight: 'normal', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>- {record.action || '로그인'}</span></span>
+                      <span style={{ fontWeight: '500' }}>
+                        <span 
+                          style={{ 
+                            cursor: selectedHistoryTeacher ? 'default' : 'pointer', 
+                            textDecoration: selectedHistoryTeacher ? 'none' : 'underline',
+                            color: selectedHistoryTeacher ? 'inherit' : 'var(--accent-blue)'
+                          }}
+                          onClick={() => { if (!selectedHistoryTeacher) setSelectedHistoryTeacher(record.name); }}
+                          title={!selectedHistoryTeacher ? "클릭하여 이 선생님의 기록만 보기" : ""}
+                        >
+                          {record.name}
+                        </span>
+                        <span style={{ fontWeight: 'normal', fontSize: '0.85rem', color: 'var(--text-secondary)' }}> - {record.action || '로그인'}</span>
+                      </span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(record.timestamp)}</span>
                     </div>
                   </li>
