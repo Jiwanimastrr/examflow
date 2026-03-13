@@ -159,9 +159,9 @@ function App() {
     }
   };
 
-  const updateExamDate = async (school: string, dateStr: string) => {
+  const updateExamDate = async (school: string, startDateStr: string, endDateStr: string) => {
     try {
-      await setDoc(doc(db, 'exam_dates', school), { school, dateStr });
+      await setDoc(doc(db, 'exam_dates', school), { school, startDateStr, endDateStr });
     } catch (error) {
       console.error("Error updating exam date:", error);
     }
@@ -169,19 +169,24 @@ function App() {
 
   const calculateDDay = (school: string) => {
     const examDate = examDates.find(d => d.school === school);
-    if (!examDate || !examDate.dateStr) return null;
+    if (!examDate || !examDate.startDateStr || !examDate.endDateStr) return null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const target = new Date(examDate.dateStr);
-    target.setHours(0, 0, 0, 0);
+    const start = new Date(examDate.startDateStr);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(examDate.endDateStr);
+    end.setHours(0, 0, 0, 0);
 
-    const diffTime = target.getTime() - today.getTime();
+    if (today >= start && today <= end) {
+      return `시험 기간 (종료까지 D-${Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))})`;
+    }
+
+    const diffTime = start.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > 0) return `D-${diffDays}`;
-    if (diffDays === 0) return `D-Day`;
-    return `D+${Math.abs(diffDays)}`;
+    return `시험 종료`;
   };
 
   const formatDate = (timestamp: number) => {
@@ -367,7 +372,7 @@ function App() {
                         <div className="flex flex-col gap-1">
                           <span style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {student.name}
-                            {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText.includes('+') ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText.includes('+') ? 'var(--text-secondary)' : 'white' }}>{dDayText}</span>}
+                            {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white' }}>{dDayText}</span>}
                           </span>
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                             {student.school} {student.grade} • {progressPct}% 달성
@@ -451,15 +456,28 @@ function App() {
               {SCHOOLS.filter(s => s !== '전체').map(school => {
                 const currentSetting = examDates.find(d => d.school === school);
                 return (
-                  <div key={school} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-                    <span style={{ fontWeight: '500' }}>{school}</span>
-                    <input 
-                      type="date"
-                      className="input"
-                      style={{ width: 'auto' }}
-                      value={currentSetting?.dateStr || ''}
-                      onChange={(e) => updateExamDate(school, e.target.value)}
-                    />
+                  <div key={school} style={{ display: 'flex', flexDirection: 'column', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: '500', fontSize: '1.1rem' }}>{school}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '40px' }}>시작:</span>
+                      <input 
+                        type="date"
+                        className="input"
+                        style={{ flex: 1 }}
+                        value={currentSetting?.startDateStr || ''}
+                        onChange={(e) => updateExamDate(school, e.target.value, currentSetting?.endDateStr || '')}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '40px' }}>종료:</span>
+                      <input 
+                        type="date"
+                        className="input"
+                        style={{ flex: 1 }}
+                        value={currentSetting?.endDateStr || ''}
+                        onChange={(e) => updateExamDate(school, currentSetting?.startDateStr || '', e.target.value)}
+                      />
+                    </div>
                   </div>
                 );
               })}

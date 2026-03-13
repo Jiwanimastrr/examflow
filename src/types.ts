@@ -28,7 +28,8 @@ export interface LoginRecord {
 
 export interface SchoolExamDate {
   school: string;
-  dateStr: string; // YYYY-MM-DD format
+  startDateStr: string; // YYYY-MM-DD format
+  endDateStr: string; // YYYY-MM-DD format
 }
 
 export interface ChecklistCategory {
