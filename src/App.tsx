@@ -5,6 +5,58 @@ import type { Student, LoginRecord, SchoolExamDate } from './types';
 import { CHECKLIST_CATEGORIES, ALL_CHECKLIST_ITEMS, SCHOOLS, GRADES } from './types';
 import './index.css';
 
+const parseStoredDate = (str: string) => {
+  if (!str) return { m: '', d: '' };
+  const parts = str.split('-');
+  if (parts.length === 3) return { m: parts[1], d: parts[2] };
+  if (parts.length === 2) return { m: parts[0], d: parts[1] };
+  return { m: '', d: '' };
+};
+
+const MonthDayInput = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
+  const { m, d } = parseStoredDate(value);
+  return (
+    <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flex: 1 }}>
+      <input 
+        type="text" 
+        maxLength={2} 
+        placeholder="월" 
+        className="input" 
+        style={{ width: '4rem', textAlign: 'center', padding: '0.4rem' }} 
+        value={m} 
+        onChange={(e) => {
+          const val = e.target.value.replace(/\D/g, '');
+          onChange(`${val}-${d}`);
+        }} 
+        onBlur={(e) => {
+          let val = e.target.value;
+          if (val.length === 1 && val !== '0') val = `0${val}`;
+          onChange(`${val}-${d}`);
+        }}
+      />
+      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>월</span>
+      <input 
+        type="text" 
+        maxLength={2} 
+        placeholder="일" 
+        className="input" 
+        style={{ width: '4rem', textAlign: 'center', padding: '0.4rem' }} 
+        value={d} 
+        onChange={(e) => {
+          const val = e.target.value.replace(/\D/g, '');
+          onChange(`${m}-${val}`);
+        }} 
+        onBlur={(e) => {
+          let val = e.target.value;
+          if (val.length === 1 && val !== '0') val = `0${val}`;
+          onChange(`${m}-${val}`);
+        }}
+      />
+      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>일</span>
+    </div>
+  );
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState('');
   const [loginNameInput, setLoginNameInput] = useState('');
@@ -237,10 +289,24 @@ function App() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const start = new Date(examDate.startDateStr);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(examDate.endDateStr);
-    end.setHours(0, 0, 0, 0);
+
+    const parseToDate = (str: string) => {
+      const { m, d } = parseStoredDate(str);
+      if (!m || !d) return null;
+      const curY = today.getFullYear();
+      const curM = today.getMonth() + 1;
+      const month = parseInt(m, 10);
+      const day = parseInt(d, 10);
+      
+      let targetY = curY;
+      // if today is Nov/Dec, and target is Jan/Feb, next year
+      if (curM >= 11 && month <= 2) targetY = curY + 1;
+      return new Date(targetY, month - 1, day);
+    };
+
+    const start = parseToDate(examDate.startDateStr);
+    const end = parseToDate(examDate.endDateStr);
+    if (!start || !end) return null;
 
     if (today >= start && today <= end) {
       return `시험 기간 (종료까지 D-${Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))})`;
@@ -596,10 +662,10 @@ function App() {
 
       {/* Exam Date Modal */}
       {showExamDateModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '500px', maxHeight: '80vh', overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
+          <div className="card fade-in" style={{ width: '450px', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>학교별 시험일 설정</h2>
+              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>학교별 시험 기간 설정</h2>
               <button onClick={() => setShowExamDateModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
             </div>
             
@@ -607,26 +673,20 @@ function App() {
               {SCHOOLS.filter(s => s !== '전체').map(school => {
                 const currentSetting = examDates.find(d => d.school === school);
                 return (
-                  <div key={school} style={{ display: 'flex', flexDirection: 'column', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', gap: '0.5rem' }}>
+                  <div key={school} style={{ display: 'flex', flexDirection: 'column', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', gap: '0.8rem' }}>
                     <span style={{ fontWeight: '500', fontSize: '1.1rem' }}>{school}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '40px' }}>시작:</span>
-                      <input 
-                        type="date"
-                        className="input"
-                        style={{ flex: 1 }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '35px' }}>시작:</span>
+                      <MonthDayInput 
                         value={currentSetting?.startDateStr || ''}
-                        onChange={(e) => updateExamDate(school, e.target.value, currentSetting?.endDateStr || '')}
+                        onChange={(val) => updateExamDate(school, val, currentSetting?.endDateStr || '')}
                       />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '40px' }}>종료:</span>
-                      <input 
-                        type="date"
-                        className="input"
-                        style={{ flex: 1 }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '35px' }}>종료:</span>
+                      <MonthDayInput 
                         value={currentSetting?.endDateStr || ''}
-                        onChange={(e) => updateExamDate(school, currentSetting?.startDateStr || '', e.target.value)}
+                        onChange={(val) => updateExamDate(school, currentSetting?.startDateStr || '', val)}
                       />
                     </div>
                   </div>
