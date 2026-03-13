@@ -56,6 +56,20 @@ function App() {
     };
   }, []);
 
+  const logActivity = async (user: string, actionDesc: string) => {
+    try {
+      const newRecord: LoginRecord = {
+        id: crypto.randomUUID(),
+        name: user,
+        timestamp: Date.now(),
+        action: actionDesc
+      };
+      await setDoc(doc(db, 'login_history', newRecord.id), newRecord);
+    } catch (e) {
+      console.warn("Failed to log activity", e);
+    }
+  };
+
   const addStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newStudentName.trim();
@@ -73,23 +87,28 @@ function App() {
     try {
       await setDoc(doc(db, 'students', newId), newStudent);
       setNewStudentName('');
+      logActivity(currentUser, `학생 '${name}' 추가`);
     } catch (error) {
       console.error("Error adding student:", error);
       alert("학생 추가 중 오류가 발생했습니다.");
     }
   };
 
-  const removeStudent = async (id: string) => {
-    if (window.confirm('정말 이 학생을 삭제하시겠습니까?')) {
+  const removeStudent = async (id: string, name: string) => {
+    if (window.confirm(`정말 '${name}' 학생을 삭제하시겠습니까?`)) {
       try {
         await deleteDoc(doc(db, 'students', id));
+        logActivity(currentUser, `학생 '${name}' 삭제`);
       } catch (error) {
         console.error("Error removing student:", error);
       }
     }
   };
 
-  const toggleProgress = async (studentId: string, itemId: string, currentState: boolean) => {
+  const toggleProgress = async (studentId: string, studentName: string, itemId: string, currentState: boolean) => {
+    const itemLabel = ALL_CHECKLIST_ITEMS.find(i => i.id === itemId)?.label || itemId;
+    const actionDesc = `학생 '${studentName}'의 [${itemLabel}] ${!currentState ? '완료 처리' : '완료 해제'}`;
+    
     try {
       // Create a dot notation key for Firestore to update only the specific nested field
       const updateKey = `progress.${itemId}`;
@@ -100,6 +119,7 @@ function App() {
           updatedAt: Date.now()
         }
       });
+      logActivity(currentUser, actionDesc);
     } catch (error) {
       console.error("Error toggling progress:", error);
       // Fallback for if the document or progress object doesn't exist yet properly
@@ -114,6 +134,7 @@ function App() {
              updatedAt: Date.now()
            };
            await setDoc(studentRef, studentData);
+           logActivity(currentUser, actionDesc);
         }
       } catch (e) {
         console.error("Fallback failed:", e);
@@ -144,16 +165,7 @@ function App() {
       setLoginPasswordInput('');
       
       // Log history to Firestore
-      try {
-        const newRecord: LoginRecord = {
-          id: crypto.randomUUID(),
-          name: capitalizedName,
-          timestamp: Date.now()
-        };
-        await setDoc(doc(db, 'login_history', newRecord.id), newRecord);
-      } catch (e) {
-        console.warn("Failed to log login history", e);
-      }
+      logActivity(capitalizedName, '로그인');
     } else {
       setLoginError('이름을 입력해주세요.');
     }
@@ -162,6 +174,7 @@ function App() {
   const updateExamDate = async (school: string, startDateStr: string, endDateStr: string) => {
     try {
       await setDoc(doc(db, 'exam_dates', school), { school, startDateStr, endDateStr });
+      logActivity(currentUser, `'${school}' 시험일정 변경`);
     } catch (error) {
       console.error("Error updating exam date:", error);
     }
@@ -259,7 +272,7 @@ function App() {
              onClick={() => setShowLoginHistoryModal(true)} 
              className="btn" 
              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'transparent', border: '1px solid var(--border-color)' }}>
-            최근 접속 기록 보기
+            최근 활동 기록 보기
           </button>
         </div>
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
@@ -396,14 +409,14 @@ function App() {
                               title={tooltip}
                               className="check-toggle"
                               checked={isChecked}
-                              onChange={() => toggleProgress(student.id, item.id, isChecked)}
+                              onChange={() => toggleProgress(student.id, student.name, item.id, isChecked)}
                             />
                           </td>
                         );
                       })}
                       <td>
                         <button 
-                          onClick={() => removeStudent(student.id)}
+                          onClick={() => removeStudent(student.id, student.name)}
                           className="btn btn-danger"
                           title="학생 삭제"
                         >
@@ -424,7 +437,7 @@ function App() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
           <div className="card fade-in" style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>최근 접속 기록</h2>
+              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>최근 접속 및 활동 기록</h2>
               <button onClick={() => setShowLoginHistoryModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
             </div>
             {loginHistory.length === 0 ? (
@@ -432,9 +445,11 @@ function App() {
             ) : (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {loginHistory.slice(0, 30).map((record, idx) => (
-                  <li key={record.id || idx} style={{ padding: '0.8rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: '500' }}>{record.name}</span>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(record.timestamp)}</span>
+                  <li key={record.id || idx} style={{ padding: '0.8rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: '500' }}>{record.name} <span style={{ fontWeight: 'normal', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>- {record.action || '로그인'}</span></span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDate(record.timestamp)}</span>
+                    </div>
                   </li>
                 ))}
               </ul>

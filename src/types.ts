@@ -24,6 +24,7 @@ export interface LoginRecord {
   id: string;
   name: string;
   timestamp: number;
+  action?: string; // Describes what the user did (e.g., '로그인', '진행도 업데이트' 등)
 }
 
 export interface SchoolExamDate {
