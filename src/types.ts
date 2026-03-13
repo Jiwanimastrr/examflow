@@ -6,12 +6,29 @@ export type ProgressState = {
 
 export type ProgressRecord = Record<string, ProgressState>;
 
+export interface StudentProgress {
+  isChecked: boolean;
+  updatedBy?: string;
+  updatedAt?: number;
+}
+
 export interface Student {
   id: string;
   name: string;
-  school?: string;
-  grade?: string;
-  progress: ProgressRecord;
+  school: string;
+  grade: string;
+  progress: Record<string, StudentProgress>;
+}
+
+export interface LoginRecord {
+  id: string;
+  name: string;
+  timestamp: number;
+}
+
+export interface SchoolExamDate {
+  school: string;
+  dateStr: string; // YYYY-MM-DD format
 }
 
 export interface ChecklistCategory {
