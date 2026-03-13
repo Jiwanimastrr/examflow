@@ -17,6 +17,7 @@ export interface StudentComment {
   text: string;
   author: string;
   timestamp: number;
+  readBy?: string[];
 }
 
 export interface Student {

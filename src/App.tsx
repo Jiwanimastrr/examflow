@@ -360,6 +360,37 @@ function App() {
     }
   };
 
+  const openCommentModal = async (studentId: string) => {
+    setSelectedStudentIdForComments(studentId);
+    
+    // Mark unread comments as read by the current user
+    const student = students.find(s => s.id === studentId);
+    if (!student || !student.comments || !currentUser) return;
+
+    let hasUpdates = false;
+    const updatedComments = student.comments.map(comment => {
+      // If it's not authored by me, and I haven't read it
+      if (comment.author !== currentUser && (!comment.readBy || !comment.readBy.includes(currentUser))) {
+        hasUpdates = true;
+        return {
+          ...comment,
+          readBy: [...(comment.readBy || []), currentUser]
+        };
+      }
+      return comment;
+    });
+
+    if (hasUpdates) {
+      try {
+        await updateDoc(doc(db, 'students', studentId), {
+          comments: updatedComments
+        });
+      } catch (error) {
+        console.error("Error marking comments as read:", error);
+      }
+    }
+  };
+
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim() || !selectedStudentIdForComments) return;
@@ -371,7 +402,8 @@ function App() {
       id: crypto.randomUUID(),
       text: newCommentText.trim(),
       author: currentUser,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      readBy: [currentUser]
     };
 
     try {
@@ -671,12 +703,17 @@ function App() {
                       <td className="student-name-col">
                         <div className="flex flex-col gap-1">
                           <span 
-                            style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
-                            onClick={() => setSelectedStudentIdForComments(student.id)}
+                            style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', position: 'relative', width: 'fit-content' }}
+                            onClick={() => openCommentModal(student.id)}
                             title="클릭하여 학생 코멘트 보기"
                           >
                             <span style={{ textDecoration: 'underline', color: 'var(--text-primary)' }}>{student.name}</span>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--accent-blue)' }}>💬</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--accent-blue)', position: 'relative' }}>
+                              💬
+                              {student.comments?.some(c => c.author !== currentUser && (!c.readBy || !c.readBy.includes(currentUser))) && (
+                                <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', backgroundColor: 'var(--accent-red)', borderRadius: '50%', boxShadow: '0 0 4px var(--accent-red-glow)' }} />
+                              )}
+                            </span>
                             {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white', cursor: 'default' }}>{dDayText}</span>}
                           </span>
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
