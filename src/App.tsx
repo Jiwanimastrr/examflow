@@ -271,10 +271,11 @@ function App() {
     }
   };
 
-  const updateExamDate = async (school: string, startDateStr: string, endDateStr: string) => {
+  const updateExamDate = async (school: string, grade: string, startDateStr: string, endDateStr: string) => {
     try {
-      await setDoc(doc(db, 'exam_dates', school), { school, startDateStr, endDateStr });
-      logActivity(currentUser, `'${school}' 시험일정 변경`);
+      const docId = `${school}_${grade}`;
+      await setDoc(doc(db, 'exam_dates', docId), { school, grade, startDateStr, endDateStr });
+      logActivity(currentUser, `'${school} ${grade}' 시험일정 변경`);
     } catch (error) {
       console.error("Error updating exam date:", error);
     }
@@ -354,8 +355,8 @@ function App() {
     }
   };
 
-  const calculateDDay = (school: string) => {
-    const examDate = examDates.find(d => d.school === school);
+  const calculateDDay = (school: string, grade: string) => {
+    const examDate = examDates.find(d => d.school === school && d.grade === grade);
     if (!examDate || !examDate.startDateStr || !examDate.endDateStr) return null;
 
     const today = new Date();
@@ -627,7 +628,7 @@ function App() {
               ) : (
                 filteredStudents.map(student => {
                   const progressPct = calculateStudentProgress(student);
-                  const dDayText = calculateDDay(student.school);
+                  const dDayText = calculateDDay(student.school, student.grade);
                   
                   return (
                     <tr key={student.id}>
@@ -740,34 +741,39 @@ function App() {
       {showExamDateModal && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
           <div className="card fade-in" style={{ width: '450px', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>학교별 시험 기간 설정</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', position: 'sticky', top: 0, backgroundColor: 'var(--bg-primary)', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', zIndex: 10 }}>
+              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>학교/학년별 시험 기간 설정</h2>
               <button onClick={() => setShowExamDateModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {SCHOOLS.filter(s => s !== '전체').map(school => {
-                const currentSetting = examDates.find(d => d.school === school);
-                return (
-                  <div key={school} style={{ display: 'flex', flexDirection: 'column', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', gap: '0.8rem' }}>
-                    <span style={{ fontWeight: '500', fontSize: '1.1rem' }}>{school}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '35px' }}>시작:</span>
-                      <MonthDayInput 
-                        value={currentSetting?.startDateStr || ''}
-                        onChange={(val) => updateExamDate(school, val, currentSetting?.endDateStr || '')}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', minWidth: '35px' }}>종료:</span>
-                      <MonthDayInput 
-                        value={currentSetting?.endDateStr || ''}
-                        onChange={(val) => updateExamDate(school, currentSetting?.startDateStr || '', val)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {SCHOOLS.filter(s => s !== '전체').map(school => (
+                <div key={school} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', color: 'var(--text-primary)', margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem' }}>{school}</h3>
+                  {GRADES.filter(g => g !== '전체').map(grade => {
+                    const currentSetting = examDates.find(d => d.school === school && d.grade === grade);
+                    return (
+                      <div key={`${school}_${grade}`} style={{ display: 'flex', flexDirection: 'column', padding: '0.8rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', gap: '0.6rem' }}>
+                        <span style={{ fontWeight: '500', fontSize: '0.95rem', color: 'var(--accent-blue)' }}>{grade}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', minWidth: '35px' }}>시작:</span>
+                          <MonthDayInput 
+                            value={currentSetting?.startDateStr || ''}
+                            onChange={(val) => updateExamDate(school, grade, val, currentSetting?.endDateStr || '')}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', minWidth: '35px' }}>종료:</span>
+                          <MonthDayInput 
+                            value={currentSetting?.endDateStr || ''}
+                            onChange={(val) => updateExamDate(school, grade, currentSetting?.startDateStr || '', val)}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         </div>
