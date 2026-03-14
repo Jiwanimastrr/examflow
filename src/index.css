@@ -527,12 +527,54 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0.8rem 1.2rem;
   }
   
-  /* Tracker Table optimizations */
-  .tracker-table th.student-name-col,
+  /* Tracker Table Vertical Stacking */
+  .tracker-table thead {
+    display: none;
+  }
+  .tracker-table, .tracker-table tbody, .tracker-table tr, .tracker-table td {
+    display: block;
+    width: 100%;
+  }
+  .tracker-table tr {
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background-color: var(--bg-primary);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    padding: 1rem;
+    /* Flex column to stack cells */
+    display: flex;
+    flex-direction: column;
+  }
   .tracker-table td.student-name-col {
-    min-width: 120px;
-    padding-left: 0.8rem;
-    font-size: 1rem;
+    padding: 0 0 1rem 0;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 0.5rem;
+    text-align: left;
+    min-width: unset;
+  }
+  
+  .checklist-cell {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .checklist-cell:last-child {
+    border-bottom: none;
+  }
+  
+  .checklist-cell::before {
+    content: attr(data-label);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .tracker-container {
+    overflow-x: visible !important;
+    padding-bottom: 1rem;
   }
   
   /* Make the tracking info section stack vertically */

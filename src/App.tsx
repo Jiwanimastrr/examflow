@@ -785,9 +785,12 @@ function App() {
                             tooltip = `체크: ${progressState.updatedBy}\n일시: ${formatDate(progressState.updatedAt || 0)}`;
                           }
                         }
+                        
+                        const categoryInfo = CHECKLIST_CATEGORIES.find(c => c.items.some(i => i.id === item.id));
+                        const mobileLabel = categoryInfo ? `[${categoryInfo.title}] ${item.label}` : item.label;
                           
                         return (
-                          <td key={item.id}>
+                          <td key={item.id} className="checklist-cell" data-label={mobileLabel}>
                             <input
                               type="checkbox"
                               title={tooltip}
