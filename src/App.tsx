@@ -562,13 +562,13 @@ function App() {
 
   return (
     <div className="container fade-in">
-      <header className="flex-col items-center justify-center gap-3" style={{ marginBottom: '2.5rem', textAlign: 'center', position: 'relative' }}>
+      <header className="flex-col items-center justify-center gap-3" style={{ marginBottom: '2.5rem', textAlign: 'center', position: 'relative', width: '100%', overflow: 'hidden' }}>
         <img src="/윌그로우로고.png" alt="윌그로우 로고" style={{ height: '50px', marginBottom: '0.5rem', objectFit: 'contain' }} />
         <h1 className="title">내신 대비 마스터</h1>
         <p className="subtitle">학생 진행도 트래커</p>
         
-        <div className="header-actions-mobile" style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div className="header-actions-mobile" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               접속자: <strong>{currentUser}</strong>
             </span>
@@ -586,7 +586,7 @@ function App() {
             최근 활동 기록 보기
           </button>
         </div>
-        <div className="header-actions-mobile" style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+        <div className="header-actions-mobile" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center', marginTop: '1rem' }}>
            <button 
              onClick={() => setShowExamDateModal(true)} 
              className="btn" 
@@ -615,7 +615,7 @@ function App() {
           <input
             type="text"
             className="input"
-            style={{ maxWidth: '200px' }}
+            style={{ flex: 1, minWidth: '150px' }}
             placeholder="새로운 학생 이름..."
             value={newStudentName}
             onChange={(e) => setNewStudentName(e.target.value)}
@@ -643,11 +643,11 @@ function App() {
           </button>
         </form>
 
-        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <input
             type="text"
             className="input search-input"
-            style={{ flex: 1, minWidth: '200px' }}
+            style={{ flex: 1, minWidth: '150px' }}
             placeholder="학생 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
