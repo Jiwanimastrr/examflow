@@ -74,6 +74,12 @@ function App() {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
   
+  // Edit Student States
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editStudentName, setEditStudentName] = useState('');
+  const [editStudentSchool, setEditStudentSchool] = useState('');
+  const [editStudentGrade, setEditStudentGrade] = useState('');
+
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
   const [newStudentGrade, setNewStudentGrade] = useState(GRADES[1]); // default to first real grade
@@ -162,6 +168,31 @@ function App() {
       } catch (error) {
         console.error("Error removing student:", error);
       }
+    }
+  };
+
+  const openEditStudentModal = (student: Student) => {
+    setEditingStudentId(student.id);
+    setEditStudentName(student.name);
+    setEditStudentSchool(student.school);
+    setEditStudentGrade(student.grade);
+  };
+
+  const saveEditStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudentId || !editStudentName.trim()) return;
+
+    try {
+      await updateDoc(doc(db, 'students', editingStudentId), {
+        name: editStudentName.trim(),
+        school: editStudentSchool,
+        grade: editStudentGrade
+      });
+      logActivity(currentUser, `학생 '${editStudentName}' 정보 수정`);
+      setEditingStudentId(null);
+    } catch (error) {
+      console.error("Error updating student:", error);
+      alert("학생 정보 수정 중 오류가 발생했습니다.");
     }
   };
 
@@ -752,10 +783,19 @@ function App() {
                           </td>
                         );
                       })}
-                      <td>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button 
+                          onClick={() => openEditStudentModal(student)} 
+                          className="btn" 
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', marginRight: '4px' }}
+                          title="학생 정보 수정"
+                        >
+                          수정
+                        </button>
                         <button 
                           onClick={() => removeStudent(student.id, student.name)}
                           className="btn btn-danger"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
                           title="학생 삭제"
                         >
                           삭제
@@ -1002,6 +1042,59 @@ function App() {
           </div>
         </div>
       )}
+
+        {/* Edit Student Modal */}
+        {editingStudentId && (
+          <div className="modal-overlay" onClick={() => setEditingStudentId(null)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="modal-title">학생 정보 수정</h2>
+                <button className="modal-close" onClick={() => setEditingStudentId(null)}>×</button>
+              </div>
+              <form onSubmit={saveEditStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>학교</label>
+                  <select 
+                    value={editStudentSchool} 
+                    onChange={e => setEditStudentSchool(e.target.value)}
+                    className="input-field"
+                  >
+                    {SCHOOLS.map(school => <option key={school} value={school}>{school}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>학년</label>
+                  <select 
+                    value={editStudentGrade} 
+                    onChange={e => setEditStudentGrade(e.target.value)}
+                    className="input-field"
+                  >
+                    {GRADES.map(grade => <option key={grade} value={grade}>{grade}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>이름</label>
+                  <input 
+                    type="text" 
+                    value={editStudentName} 
+                    onChange={e => setEditStudentName(e.target.value)} 
+                    placeholder="학생 이름" 
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                  <button type="button" onClick={() => setEditingStudentId(null)} className="btn" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                    취소
+                  </button>
+                  <button type="submit" className="btn" style={{ backgroundColor: 'var(--accent-blue)', color: 'white' }}>
+                    저장
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
     </div>
   );
