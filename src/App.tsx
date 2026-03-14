@@ -734,12 +734,20 @@ function App() {
                       <td className="student-name-col">
                         <div className="flex flex-col gap-1">
                           <span 
-                            style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', position: 'relative', width: 'fit-content' }}
-                            onClick={() => openCommentModal(student.id)}
-                            title="클릭하여 학생 코멘트 보기"
+                            style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative', width: 'fit-content' }}
                           >
-                            <span style={{ textDecoration: 'underline', color: 'var(--text-primary)' }}>{student.name}</span>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--accent-blue)', position: 'relative' }}>
+                            <span 
+                              style={{ textDecoration: 'underline', color: 'var(--text-primary)', cursor: 'pointer' }}
+                              onClick={() => openEditStudentModal(student)}
+                              title="클릭하여 학생 정보 수정"
+                            >
+                              {student.name}
+                            </span>
+                            <span 
+                              style={{ fontSize: '0.8rem', color: 'var(--accent-blue)', position: 'relative', cursor: 'pointer' }}
+                              onClick={() => openCommentModal(student.id)}
+                              title="클릭하여 학생 코멘트 열람"
+                            >
                               💬
                               {student.comments?.some(c => c.author !== currentUser && (!c.readBy || !c.readBy.includes(currentUser))) && (
                                 <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', backgroundColor: 'var(--accent-red)', borderRadius: '50%', boxShadow: '0 0 4px var(--accent-red-glow)' }} />
