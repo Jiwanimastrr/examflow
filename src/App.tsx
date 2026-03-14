@@ -79,6 +79,7 @@ function App() {
   const [editStudentName, setEditStudentName] = useState('');
   const [editStudentSchool, setEditStudentSchool] = useState('');
   const [editStudentGrade, setEditStudentGrade] = useState('');
+  const [editPopupPosition, setEditPopupPosition] = useState<{ top: number, left: number } | null>(null);
 
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
@@ -171,11 +172,18 @@ function App() {
     }
   };
 
-  const openEditStudentModal = (student: Student) => {
+  const openEditStudentModal = (e: React.MouseEvent, student: Student) => {
+    e.stopPropagation(); // prevent other clicks
     setEditingStudentId(student.id);
     setEditStudentName(student.name);
     setEditStudentSchool(student.school);
     setEditStudentGrade(student.grade);
+    
+    // Position the popup slightly below and to the right of the cursor
+    setEditPopupPosition({
+      top: e.clientY + 15,
+      left: e.clientX + 10
+    });
   };
 
   const saveEditStudent = async (e: React.FormEvent) => {
@@ -738,7 +746,7 @@ function App() {
                           >
                             <span 
                               style={{ textDecoration: 'underline', color: 'var(--text-primary)', cursor: 'pointer' }}
-                              onClick={() => openEditStudentModal(student)}
+                              onClick={(e) => openEditStudentModal(e, student)}
                               title="클릭하여 학생 정보 수정"
                             >
                               {student.name}
@@ -793,7 +801,7 @@ function App() {
                       })}
                       <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button 
-                          onClick={() => openEditStudentModal(student)} 
+                          onClick={(e) => openEditStudentModal(e, student)} 
                           className="btn" 
                           style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', marginRight: '4px' }}
                           title="학생 정보 수정"
@@ -1051,15 +1059,35 @@ function App() {
         </div>
       )}
 
-        {/* Edit Student Modal */}
-        {editingStudentId && (
-          <div className="modal-overlay" onClick={() => setEditingStudentId(null)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2 className="modal-title">학생 정보 수정</h2>
-                <button className="modal-close" onClick={() => setEditingStudentId(null)}>×</button>
-              </div>
-              <form onSubmit={saveEditStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Edit Student Popup */}
+        {editingStudentId && editPopupPosition && (
+          <div 
+            className="card fade-in" 
+            style={{ 
+              position: 'fixed', 
+              top: editPopupPosition.top, 
+              left: editPopupPosition.left, 
+              width: '280px', 
+              zIndex: 9999, 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              border: '1px solid var(--border-color)',
+              padding: '1.2rem'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>학생 정보 수정</h3>
+              <button 
+                onClick={() => {
+                  setEditingStudentId(null);
+                  setEditPopupPosition(null);
+                }}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={saveEditStudent} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>학교</label>
                   <select 
@@ -1091,16 +1119,23 @@ function App() {
                     required
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-                  <button type="button" onClick={() => setEditingStudentId(null)} className="btn" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditingStudentId(null);
+                      setEditPopupPosition(null);
+                    }} 
+                    className="btn" 
+                    style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                  >
                     취소
                   </button>
-                  <button type="submit" className="btn" style={{ backgroundColor: 'var(--accent-blue)', color: 'white' }}>
+                  <button type="submit" className="btn" style={{ backgroundColor: 'var(--accent-blue)', color: 'white', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
                     저장
                   </button>
                 </div>
               </form>
-            </div>
           </div>
         )}
 
