@@ -715,7 +715,6 @@ function App() {
                     {category.title}
                   </th>
                 ))}
-                <th rowSpan={2} style={{ minWidth: '80px' }}>관리</th>
               </tr>
               <tr>
                 {CHECKLIST_CATEGORIES.flatMap(cat => cat.items).map(item => (
@@ -728,7 +727,7 @@ function App() {
             <tbody>
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={ALL_CHECKLIST_ITEMS.length + 2} style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
+                  <td colSpan={ALL_CHECKLIST_ITEMS.length + 1} style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
                     {searchQuery ? '검색 결과가 없습니다.' : '등록된 학생이 없습니다. 학생을 추가해주세요.'}
                   </td>
                 </tr>
@@ -799,24 +798,6 @@ function App() {
                           </td>
                         );
                       })}
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button 
-                          onClick={(e) => openEditStudentModal(e, student)} 
-                          className="btn" 
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', marginRight: '4px' }}
-                          title="학생 정보 수정"
-                        >
-                          수정
-                        </button>
-                        <button 
-                          onClick={() => removeStudent(student.id, student.name)}
-                          className="btn btn-danger"
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                          title="학생 삭제"
-                        >
-                          삭제
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
@@ -1119,21 +1100,37 @@ function App() {
                     required
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
                   <button 
                     type="button" 
                     onClick={() => {
-                      setEditingStudentId(null);
-                      setEditPopupPosition(null);
+                      if (editingStudentId) {
+                        removeStudent(editingStudentId, editStudentName);
+                        setEditingStudentId(null);
+                        setEditPopupPosition(null);
+                      }
                     }} 
-                    className="btn" 
-                    style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                    className="btn btn-danger" 
+                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                   >
-                    취소
+                    삭제
                   </button>
-                  <button type="submit" className="btn" style={{ backgroundColor: 'var(--accent-blue)', color: 'white', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                    저장
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setEditingStudentId(null);
+                        setEditPopupPosition(null);
+                      }} 
+                      className="btn" 
+                      style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                    >
+                      취소
+                    </button>
+                    <button type="submit" className="btn" style={{ backgroundColor: 'var(--accent-blue)', color: 'white', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                      저장
+                    </button>
+                  </div>
                 </div>
               </form>
           </div>
