@@ -567,8 +567,8 @@ function App() {
         <h1 className="title">내신 대비 마스터</h1>
         <p className="subtitle">학생 진행도 트래커</p>
         
-        <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="header-actions-mobile" style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               접속자: <strong>{currentUser}</strong>
             </span>
@@ -586,14 +586,14 @@ function App() {
             최근 활동 기록 보기
           </button>
         </div>
-        <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="header-actions-mobile" style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
            <button 
              onClick={() => setShowExamDateModal(true)} 
              className="btn" 
              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
             학교별 시험일 설정
           </button>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button 
                onClick={() => setShowResetModal(true)} 
                className="btn" 
@@ -674,9 +674,9 @@ function App() {
 
         {/* Ranking Dashboard */}
         {students.length > 0 && (
-          <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+          <div className="flex-mobile-col" style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
             {/* Top 3 */}
-            <div style={{ flex: 1, minWidth: '250px', backgroundColor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: '12px', padding: '1rem' }}>
+            <div style={{ flex: 1, minWidth: 'min(100%, 250px)', backgroundColor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: '12px', padding: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', color: '#2e7d32', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 🏆 달성율 RANK TOP 3
               </h3>
@@ -690,7 +690,7 @@ function App() {
             </div>
             
             {/* Bottom 3 */}
-            <div style={{ flex: 1, minWidth: '250px', backgroundColor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.2)', borderRadius: '12px', padding: '1rem' }}>
+            <div style={{ flex: 1, minWidth: 'min(100%, 250px)', backgroundColor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.2)', borderRadius: '12px', padding: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', color: '#c62828', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 🚨 달성율 HURRY UP BOTTOM 3
               </h3>

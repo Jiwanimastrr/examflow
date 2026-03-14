@@ -477,3 +477,67 @@ h1, h2, h3, h4, h5, h6 {
 @media (prefers-color-scheme: dark) {
   .category-header { border-bottom: 2px solid rgba(255,255,255,0.1); }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Responsive Layout (Mobile Support)                                         */
+/* -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  body {
+    padding: 1rem;
+  }
+  
+  .title {
+    font-size: 1.8rem;
+  }
+  
+  .subtitle {
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .card {
+    padding: 1.5rem;
+  }
+
+  /* Make header flex-col and allow wrapping */
+  .header-actions-mobile {
+    position: static !important;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    width: 100%;
+  }
+
+  /* Responsive inner flex containers */
+  .flex-mobile-col {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  .student-add-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Resize inputs and buttons for mobile touch targets */
+  .input, .select, .btn {
+    font-size: 1rem;
+    padding: 0.8rem 1.2rem;
+  }
+  
+  /* Tracker Table optimizations */
+  .tracker-table th.student-name-col,
+  .tracker-table td.student-name-col {
+    min-width: 120px;
+    padding-left: 0.8rem;
+    font-size: 1rem;
+  }
+  
+  /* Make the tracking info section stack vertically */
+  .header-panels-mobile {
+    flex-direction: column;
+    gap: 1rem !important;
+  }
+}
