@@ -706,7 +706,7 @@ function App() {
     return (
       <div className="container fade-in flex items-center justify-center" style={{ minHeight: '80vh' }}>
         <div className="card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
-          <img src="/윌그로우로고.png" alt="윌그로우 로고" style={{ height: '40px', marginBottom: '1rem', objectFit: 'contain' }} />
+          <img src={`${import.meta.env.BASE_URL}윌그로우로고.png`} alt="윌그로우 로고" style={{ height: '40px', marginBottom: '1rem', objectFit: 'contain' }} />
           <h1 className="title" style={{ fontSize: '2rem' }}>환영합니다</h1>
           <p className="subtitle" style={{ marginBottom: '2rem' }}>내신대비 트래커에 접속하려면 이름을 입력해주세요.</p>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -771,7 +771,7 @@ function App() {
   return (
     <div className="container fade-in">
       <header className="flex-col items-center justify-center gap-3" style={{ marginBottom: '2.5rem', textAlign: 'center', position: 'relative', width: '100%', overflow: 'hidden' }}>
-        <img src="/윌그로우로고.png" alt="윌그로우 로고" style={{ height: '50px', marginBottom: '0.5rem', objectFit: 'contain' }} />
+        <img src={`${import.meta.env.BASE_URL}윌그로우로고.png`} alt="윌그로우 로고" style={{ height: '50px', marginBottom: '0.5rem', objectFit: 'contain' }} />
         <h1 className="title">내신 대비 마스터</h1>
         <p className="subtitle">학생 진행도 트래커</p>
         
@@ -829,7 +829,7 @@ function App() {
           <input
             type="text"
             className="input"
-            style={{ flex: 1, minWidth: '150px' }}
+            style={{ width: '180px', flex: 'none' }}
             placeholder="새로운 학생 이름..."
             value={newStudentName}
             onChange={(e) => setNewStudentName(e.target.value)}
