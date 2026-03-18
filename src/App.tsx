@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Student, LoginRecord, SchoolExamDate, StudentComment } from './types';
-import { CHECKLIST_CATEGORIES, ALL_CHECKLIST_ITEMS, SCHOOLS, GRADES } from './types';
+import { EXAM_MATERIALS, ALL_CHECKLIST_ITEMS, SCHOOLS, GRADES, LESSONS } from './types';
 import './index.css';
 
 const parseStoredDate = (str: string) => {
@@ -58,6 +58,8 @@ const MonthDayInput = ({ value, onChange }: { value: string, onChange: (val: str
 };
 
 function App() {
+  const [activeMaterialId, setActiveMaterialId] = useState(EXAM_MATERIALS[0].title);
+  const [activeLesson, setActiveLesson] = useState(LESSONS[0]);
   const [currentUser, setCurrentUser] = useState('');
   const [loginNameInput, setLoginNameInput] = useState('');
   const [loginPasswordInput, setLoginPasswordInput] = useState('');
@@ -79,11 +81,25 @@ function App() {
   const [editStudentName, setEditStudentName] = useState('');
   const [editStudentSchool, setEditStudentSchool] = useState('');
   const [editStudentGrade, setEditStudentGrade] = useState('');
+  const [editStudentAssignedItems, setEditStudentAssignedItems] = useState<string[]>([]);
   const [editPopupPosition, setEditPopupPosition] = useState<{ top: number, left: number } | null>(null);
+  const [editPopupLesson, setEditPopupLesson] = useState(LESSONS[0]);
+
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+  const [bulkAssignSelectedStudents, setBulkAssignSelectedStudents] = useState<string[]>([]);
+  const [bulkAssignLesson, setBulkAssignLesson] = useState(LESSONS[0]);
+  const [bulkAssignSelectedItems, setBulkAssignSelectedItems] = useState<string[]>([]);
+  const [bulkAssignSchoolFilter, setBulkAssignSchoolFilter] = useState('전체');
+  const [bulkAssignGradeFilter, setBulkAssignGradeFilter] = useState('전체');
+  const [bulkAssignNewCustomTask, setBulkAssignNewCustomTask] = useState('');
+  const [bulkAssignCustomTasksList, setBulkAssignCustomTasksList] = useState<{id: string, label: string}[]>([]);
 
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
   const [newStudentGrade, setNewStudentGrade] = useState(GRADES[1]); // default to first real grade
+  
+  const [newCustomTask, setNewCustomTask] = useState("");
+  const [editStudentCustomTasks, setEditStudentCustomTasks] = useState<{id: string, label: string, lesson?: string}[]>([]);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSchool, setFilterSchool] = useState(SCHOOLS[0]); // default '전체'
@@ -123,6 +139,35 @@ function App() {
     };
   }, []);
 
+  const teacherTasksCategoryItems = React.useMemo(() => {
+    const items: { id: string, label: string }[] = [];
+    const seenIds = new Set<string>();
+    students.forEach(student => {
+      (student.customTasks || []).forEach(task => {
+        if (task.label.toUpperCase() === 'SMOOTH VOCAB') return;
+        const tLesson = task.lesson || '1과';
+        if (tLesson === activeLesson && !seenIds.has(task.id)) {
+          seenIds.add(task.id);
+          items.push(task);
+        }
+      });
+    });
+    return items;
+  }, [students, activeLesson]);
+
+  const ALL_MATERIALS = React.useMemo(() => {
+    const teacherMaterial = {
+      title: "선생님 과제",
+      categories: [
+        {
+          title: "개별 할당 과제",
+          items: teacherTasksCategoryItems
+        }
+      ]
+    };
+    return [...EXAM_MATERIALS, teacherMaterial];
+  }, [teacherTasksCategoryItems]);
+
   const logActivity = async (user: string, actionDesc: string) => {
     try {
       const newRecord: LoginRecord = {
@@ -149,6 +194,7 @@ function App() {
       school: newStudentSchool,
       grade: newStudentGrade,
       progress: {},
+      assignedItems: LESSONS.flatMap(l => ALL_CHECKLIST_ITEMS.map(i => `${l}_${i.id}`)),
     };
 
     try {
@@ -179,6 +225,30 @@ function App() {
     setEditStudentSchool(student.school);
     setEditStudentGrade(student.grade);
     
+    let normalizedAssigns: string[];
+    if (student.assignedItems) {
+      const hasLessonPrefix = student.assignedItems.some(k => LESSONS.some(l => k.startsWith(`${l}_`)));
+      if (!hasLessonPrefix) {
+        normalizedAssigns = LESSONS.flatMap(l => student.assignedItems!.map(k => `${l}_${k}`));
+      } else {
+        normalizedAssigns = student.assignedItems.map(k => {
+          if (!LESSONS.some(l => k.startsWith(`${l}_`))) return `1과_${k}`;
+          return k;
+        });
+      }
+    } else {
+      normalizedAssigns = LESSONS.flatMap(l => ALL_CHECKLIST_ITEMS.map(i => `${l}_${i.id}`));
+    }
+    setEditStudentAssignedItems(normalizedAssigns);
+    
+    const normalizedTasks = (student.customTasks || []).map(t => ({
+      ...t,
+      lesson: t.lesson || '1과'
+    }));
+    setEditStudentCustomTasks(normalizedTasks);
+    setNewCustomTask("");
+    setEditPopupLesson(LESSONS[0]);
+    
     // Position the popup slightly below and to the right of the cursor
     setEditPopupPosition({
       top: e.clientY + 15,
@@ -194,7 +264,9 @@ function App() {
       await updateDoc(doc(db, 'students', editingStudentId), {
         name: editStudentName.trim(),
         school: editStudentSchool,
-        grade: editStudentGrade
+        grade: editStudentGrade,
+        assignedItems: editStudentAssignedItems,
+        customTasks: editStudentCustomTasks
       });
       logActivity(currentUser, `학생 '${editStudentName}' 정보 수정`);
       setEditingStudentId(null);
@@ -204,13 +276,56 @@ function App() {
     }
   };
 
-  const toggleProgress = async (studentId: string, studentName: string, itemId: string, currentState: boolean) => {
+  const getStudentProgressState = (student: Student, lesson: string, itemId: string) => {
+    const key = `${lesson}_${itemId}`;
+    let progressData = student.progress?.[key];
+    if (progressData === undefined && lesson === '1과') {
+      progressData = student.progress?.[itemId];
+    }
+    const isLegacyBoolean = typeof progressData === 'boolean';
+    return {
+      isChecked: isLegacyBoolean ? progressData : (progressData?.isChecked ?? false),
+      data: progressData
+    };
+  };
+
+  const isItemAssigned = (student: Student, lesson: string, itemId: string) => {
+    // If it's a teacher custom task, only show it if the current student actually has it
+    if (itemId.startsWith('custom_')) {
+      const isStudentCustomTask = student.customTasks?.some(t => t.id === itemId && (t.lesson || '1과') === lesson);
+      if (!isStudentCustomTask) return false;
+    }
+
+    if (!student.assignedItems) return true;
+    const key = `${lesson}_${itemId}`;
+    if (student.assignedItems.includes(key)) return true;
+    const hasLessonPrefix = student.assignedItems.some(k => LESSONS.some(l => k.startsWith(`${l}_`)));
+    if (!hasLessonPrefix && student.assignedItems.includes(itemId)) return true;
+    if (lesson === '1과' && student.assignedItems.includes(itemId)) return true;
+    return false;
+  };
+
+  const getAllPossibleAssignedItems = (student: Student) => {
+    if (student.assignedItems) {
+      const hasLessonPrefix = student.assignedItems.some(k => LESSONS.some(l => k.startsWith(`${l}_`)));
+      if (!hasLessonPrefix) {
+        return LESSONS.flatMap(l => student.assignedItems!.map(k => `${l}_${k}`));
+      }
+      return student.assignedItems.map(key => {
+        if (!LESSONS.some(l => key.startsWith(`${l}_`))) return `1과_${key}`;
+        return key;
+      });
+    }
+    return LESSONS.flatMap(l => ALL_CHECKLIST_ITEMS.map(i => `${l}_${i.id}`));
+  };
+
+  const toggleProgress = async (studentId: string, studentName: string, lesson: string, itemId: string, currentState: boolean) => {
     const itemLabel = ALL_CHECKLIST_ITEMS.find(i => i.id === itemId)?.label || itemId;
-    const actionDesc = `학생 '${studentName}'의 [${itemLabel}] ${!currentState ? '완료 처리' : '완료 해제'}`;
+    const actionDesc = `학생 '${studentName}'의 [${lesson} ${itemLabel}] ${!currentState ? '완료 처리' : '완료 해제'}`;
     
     try {
       // Create a dot notation key for Firestore to update only the specific nested field
-      const updateKey = `progress.${itemId}`;
+      const updateKey = `progress.${lesson}_${itemId}`;
       await updateDoc(doc(db, 'students', studentId), {
         [updateKey]: {
           isChecked: !currentState,
@@ -227,7 +342,7 @@ function App() {
         const docSnap = await getDoc(studentRef);
         if (docSnap.exists()) {
            const studentData = docSnap.data() as Student;
-           studentData.progress[itemId] = {
+           studentData.progress[`${lesson}_${itemId}`] = {
              isChecked: !currentState,
              updatedBy: currentUser,
              updatedAt: Date.now()
@@ -242,16 +357,48 @@ function App() {
   };
 
   const calculateStudentProgress = (student: Student) => {
-    const total = ALL_CHECKLIST_ITEMS.length;
-    let completed = 0;
-    ALL_CHECKLIST_ITEMS.forEach(item => {
-      const progressData = student.progress && student.progress[item.id];
-      const isLegacyBoolean = typeof progressData === 'boolean';
-      // @ts-ignore - Handle legacy boolean format
-      const isChecked = isLegacyBoolean ? progressData : (progressData?.isChecked ?? false);
-      if (isChecked) completed++;
+    const activeMaterial = ALL_MATERIALS.find(m => m.title === activeMaterialId);
+    const assignedKeys = getAllPossibleAssignedItems(student);
+    
+    // Overall progress
+    let totalAssigned = assignedKeys.length;
+    let totalCompleted = 0;
+    assignedKeys.forEach(key => {
+      const match = key.match(/^(\d+과)_(.+)$/);
+      if (match) {
+        const [, lesson, itemId] = match;
+        if (getStudentProgressState(student, lesson, itemId).isChecked) totalCompleted++;
+      }
     });
-    return total === 0 ? 0 : Math.round((completed / total) * 100);
+    const overallProgressPct = totalAssigned === 0 ? 0 : Math.round((totalCompleted / totalAssigned) * 100);
+
+    // Current tab progress
+    let tabProgressPct = 0;
+    if (activeMaterial) {
+      const materialItemIds = activeMaterial.categories.flatMap(cat => cat.items).map(i => i.id);
+      const tabAssignedKeys = assignedKeys.filter(key => {
+        const match = key.match(/^(\d+과)_(.+)$/);
+        if (!match) return false;
+        const [, lesson, itemId] = match;
+        return lesson === activeLesson && materialItemIds.includes(itemId);
+      });
+      const totalInTab = tabAssignedKeys.length;
+      let completedInTab = 0;
+      
+      tabAssignedKeys.forEach(key => {
+        const match = key.match(/^(\d+과)_(.+)$/);
+        if (match) {
+          const [, lesson, itemId] = match;
+          if (getStudentProgressState(student, lesson, itemId).isChecked) completedInTab++;
+        }
+      });
+      tabProgressPct = totalInTab === 0 ? 0 : Math.round((completedInTab / totalInTab) * 100);
+    }
+    
+    return {
+      currentMaterialPct: tabProgressPct,
+      overallPct: overallProgressPct
+    };
   };
 
   const migrateLocalDataToFirebase = async (userName: string) => {
@@ -373,6 +520,59 @@ function App() {
     } catch (error) {
       console.error("Error resetting all progress:", error);
       alert("초기화 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (bulkAssignSelectedStudents.length === 0) {
+      alert("배정할 학생을 1명 이상 선택해주세요.");
+      return;
+    }
+    if (bulkAssignSelectedItems.length === 0 && bulkAssignCustomTasksList.length === 0) {
+      alert("배정할 과제를 1개 이상 선택해주세요.");
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      
+      bulkAssignSelectedStudents.forEach(studentId => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+
+        const currentAssigned = student.assignedItems || [];
+        const newAssignedItems = bulkAssignSelectedItems.map(itemId => `${bulkAssignLesson}_${itemId}`);
+        
+        let updatedCustomTasks = student.customTasks ? [...student.customTasks] : [];
+        const newCustomTaskKeys: string[] = [];
+
+        bulkAssignCustomTasksList.forEach(task => {
+          if (!updatedCustomTasks.some(t => t.id === task.id && (t.lesson || '1과') === bulkAssignLesson)) {
+            updatedCustomTasks.push({ ...task, lesson: bulkAssignLesson });
+          }
+          newCustomTaskKeys.push(`${bulkAssignLesson}_${task.id}`);
+        });
+
+        const updatedAssigned = Array.from(new Set([...currentAssigned, ...newAssignedItems, ...newCustomTaskKeys]));
+        
+        batch.update(doc(db, 'students', studentId), {
+          assignedItems: updatedAssigned,
+          customTasks: updatedCustomTasks
+        });
+      });
+
+      await batch.commit();
+      logActivity(currentUser, `${bulkAssignSelectedStudents.length}명 학생에게 ${bulkAssignLesson} 일괄 과제 배정`);
+      
+      setShowBulkAssignModal(false);
+      setBulkAssignSelectedStudents([]);
+      setBulkAssignSelectedItems([]);
+      setBulkAssignCustomTasksList([]);
+      setBulkAssignNewCustomTask('');
+      alert("일괄 배정이 완료되었습니다.");
+    } catch (error) {
+      console.error("일괄 배정 오류:", error);
+      alert("일괄 배정 중 오류가 발생했습니다.");
     }
   };
 
@@ -542,22 +742,30 @@ function App() {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSchool = filterSchool === '전체' || student.school === filterSchool;
     const matchesGrade = filterGrade === '전체' || student.grade === filterGrade;
-    return matchesSearch && matchesSchool && matchesGrade;
+    
+    // Filter out students who have 0 assigned items matching the current active tab
+    const activeMaterial = ALL_MATERIALS.find(m => m.title === activeMaterialId);
+    const hasAnyActiveItem = activeMaterial?.categories.some(cat => 
+        cat.items.some(item => isItemAssigned(student, activeLesson, item.id))
+    );
+    
+    const isSearching = searchQuery.trim().length > 0;
+    return matchesSearch && matchesSchool && matchesGrade && (hasAnyActiveItem || isSearching);
   });
 
   const studentsWithProgress = students.map(student => ({
     ...student,
-    progressPct: calculateStudentProgress(student)
+    progressData: calculateStudentProgress(student)
   }));
   
   // Exclude students with 0% from bottom if they just started? Or keep it literal? 
   // Let's keep it literal and just sort. To resolve ties it's stable enough.
-  const sortedByProgressDesc = [...studentsWithProgress].sort((a, b) => b.progressPct - a.progressPct);
+  const sortedByProgressDesc = [...studentsWithProgress].sort((a, b) => b.progressData.currentMaterialPct - a.progressData.currentMaterialPct);
   const top3Students = sortedByProgressDesc.slice(0, 3);
   
   // To avoid showing the exact same top 3 in bottom 3 if there are very few students,
   // we can just reverse, but normally we just take the last 3 or sort ascending.
-  const sortedByProgressAsc = [...studentsWithProgress].sort((a, b) => a.progressPct - b.progressPct);
+  const sortedByProgressAsc = [...studentsWithProgress].sort((a, b) => a.progressData.currentMaterialPct - b.progressData.currentMaterialPct);
   const bottom3Students = sortedByProgressAsc.slice(0, 3);
 
   return (
@@ -594,6 +802,12 @@ function App() {
             학교별 시험일 설정
           </button>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button 
+              onClick={() => setShowBulkAssignModal(true)} 
+              className="btn" 
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--accent-blue)', color: 'white', border: 'none' }}>
+              과제 일괄 배정
+            </button>
             <button 
                onClick={() => setShowResetModal(true)} 
                className="btn" 
@@ -672,18 +886,61 @@ function App() {
           </select>
         </div>
 
+        <div className="material-tabs" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+          {ALL_MATERIALS.map(material => (
+            <button
+              key={material.title}
+              onClick={() => setActiveMaterialId(material.title)}
+              className="btn"
+              style={{
+                padding: '0.6rem 1.2rem',
+                whiteSpace: 'nowrap',
+                backgroundColor: activeMaterialId === material.title ? 'var(--accent-blue)' : 'var(--bg-secondary)',
+                color: activeMaterialId === material.title ? 'white' : 'var(--text-primary)',
+                border: `1px solid ${activeMaterialId === material.title ? 'var(--accent-blue)' : 'var(--border-color)'}`,
+                fontWeight: activeMaterialId === material.title ? 'bold' : 'normal',
+                boxShadow: activeMaterialId === material.title ? '0 2px 8px rgba(33, 150, 243, 0.3)' : 'none'
+              }}
+            >
+              {material.title}
+            </button>
+          ))}
+        </div>
+
+        <div className="lesson-tabs" style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.5rem', scrollbarWidth: 'thin' }}>
+          {LESSONS.map(lesson => (
+            <button
+              key={lesson}
+              onClick={() => setActiveLesson(lesson)}
+              className="btn"
+              style={{
+                backgroundColor: activeLesson === lesson ? 'var(--accent-gold, #d4af37)' : 'var(--bg-secondary)',
+                color: activeLesson === lesson ? 'white' : 'var(--text-secondary)',
+                fontWeight: activeLesson === lesson ? 'bold' : 'normal',
+                fontSize: '0.9rem',
+                border: activeLesson === lesson ? 'none' : '1px solid var(--border-color)',
+                whiteSpace: 'nowrap',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '20px'
+              }}
+            >
+              {lesson}
+            </button>
+          ))}
+        </div>
+
         {/* Ranking Dashboard */}
-        {students.length > 0 && (
+        {filteredStudents.length > 0 && (
           <div className="flex-mobile-col" style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
             {/* Top 3 */}
             <div style={{ flex: 1, minWidth: 'min(100%, 250px)', backgroundColor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: '12px', padding: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', color: '#2e7d32', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                🏆 달성율 RANK TOP 3
+                🏆 달성율 RANK TOP 3 ({activeMaterialId})
               </h3>
               <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-                {top3Students.map((s) => (
+                {top3Students.filter(s => filteredStudents.some(fs => fs.id === s.id)).slice(0, 3).map((s) => (
                   <li key={s.id}>
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#2e7d32' }}>{s.progressPct}%</strong>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#2e7d32' }}>{s.progressData.currentMaterialPct}%</strong>
                   </li>
                 ))}
               </ol>
@@ -692,12 +949,12 @@ function App() {
             {/* Bottom 3 */}
             <div style={{ flex: 1, minWidth: 'min(100%, 250px)', backgroundColor: 'rgba(244, 67, 54, 0.05)', border: '1px solid rgba(244, 67, 54, 0.2)', borderRadius: '12px', padding: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', color: '#c62828', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                🚨 달성율 HURRY UP BOTTOM 3
+                🚨 달성율 HURRY UP BOTTOM 3 ({activeMaterialId})
               </h3>
               <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-                {bottom3Students.map((s) => (
+                {bottom3Students.filter(s => filteredStudents.some(fs => fs.id === s.id)).slice(0, 3).map((s) => (
                   <li key={s.id}>
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#c62828' }}>{s.progressPct}%</strong>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#c62828' }}>{s.progressData.currentMaterialPct}%</strong>
                   </li>
                 ))}
               </ol>
@@ -710,14 +967,14 @@ function App() {
             <thead>
               <tr>
                 <th rowSpan={2} className="student-name-col">학생 명단</th>
-                {CHECKLIST_CATEGORIES.map(category => (
+                {ALL_MATERIALS.find(m => m.title === activeMaterialId)?.categories.map(category => (
                   <th key={category.title} colSpan={category.items.length} className="category-header">
                     {category.title}
                   </th>
                 ))}
               </tr>
               <tr>
-                {CHECKLIST_CATEGORIES.flatMap(cat => cat.items).map(item => (
+                {ALL_MATERIALS.find(m => m.title === activeMaterialId)?.categories.flatMap(cat => cat.items).map(item => (
                   <th key={item.id} title={item.label} style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-primary)' }}>
                     {item.label}
                   </th>
@@ -727,8 +984,8 @@ function App() {
             <tbody>
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={ALL_CHECKLIST_ITEMS.length + 1} style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
-                    {searchQuery ? '검색 결과가 없습니다.' : '등록된 학생이 없습니다. 학생을 추가해주세요.'}
+                  <td colSpan={(ALL_MATERIALS.find(m => m.title === activeMaterialId)?.categories.flatMap(cat => cat.items).length || 0) + 1} style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
+                    {searchQuery ? '검색 결과가 없습니다.' : '현재 탭에 배정된 할일이 있는 학생이 없습니다.'}
                   </td>
                 </tr>
               ) : (
@@ -762,31 +1019,62 @@ function App() {
                             </span>
                             {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white', cursor: 'default' }}>{dDayText}</span>}
                           </span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            {student.school} {student.grade} • {progressPct}% 달성
-                          </span>
-                          <div className="progress-wrapper">
-                            <div className="progress-fill" style={{ width: `${progressPct}%` }} />
+                          
+                          {/* Current Material Progress */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <span>현재 탭 달성률 ({activeMaterialId})</span>
+                              <span style={{ fontWeight: 'bold' }}>{progressPct.currentMaterialPct}%</span>
+                            </div>
+                            <div className="progress-wrapper">
+                              <div className="progress-fill" style={{ width: `${progressPct.currentMaterialPct}%` }} />
+                            </div>
                           </div>
+
+                          {/* Overall Material Progress */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <span>전체 과정 달성률 (통합)</span>
+                              <span style={{ fontWeight: 'bold', color: 'var(--accent-gold, #b8860b)' }}>{progressPct.overallPct}%</span>
+                            </div>
+                            <div className="progress-wrapper" style={{ backgroundColor: 'rgba(184, 134, 11, 0.15)' }}>
+                              <div className="progress-fill" style={{ width: `${progressPct.overallPct}%`, backgroundColor: 'var(--accent-gold, #d4af37)' }} />
+                            </div>
+                          </div>
+
                         </div>
                       </td>
-                      {ALL_CHECKLIST_ITEMS.map(item => {
-                        const progressState = student.progress && student.progress[item.id];
-                        const isLegacyBoolean = typeof progressState === 'boolean';
-                        // @ts-ignore
-                        const isChecked = isLegacyBoolean ? progressState : (progressState?.isChecked ?? false);
+                      {ALL_MATERIALS.find(m => m.title === activeMaterialId)?.categories.flatMap(cat => cat.items).map(item => {
+                        const isAssigned = isItemAssigned(student, activeLesson, item.id);
                         
+                        const progressState = getStudentProgressState(student, activeLesson, item.id);
+                        const isChecked = progressState.isChecked;
                         let tooltip = `${student.name} - ${item.label}`;
+                        
                         if (isChecked) {
-                          if (isLegacyBoolean) {
+                          if (typeof progressState.data === 'boolean') {
                             tooltip = `${student.name} - ${item.label} (선생님/시간 기록 없음)`;
-                          } else if (progressState) {
-                            // @ts-ignore
-                            tooltip = `체크: ${progressState.updatedBy}\n일시: ${formatDate(progressState.updatedAt || 0)}`;
+                          } else if (progressState.data && typeof progressState.data !== 'boolean') {
+                            tooltip = `체크: ${progressState.data.updatedBy}\n일시: ${formatDate(progressState.data.updatedAt || 0)}`;
                           }
                         }
+
+                        if (!isAssigned) {
+                          return (
+                            <td key={item.id} className="checklist-cell" style={{ backgroundColor: 'var(--bg-secondary)', textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                className="check-toggle"
+                                style={{ opacity: 0.3, cursor: 'not-allowed' }}
+                                title="할당되지 않은 과제입니다"
+                                checked={!!isChecked}
+                                readOnly
+                              />
+                            </td>
+                          );
+                        }
                         
-                        const categoryInfo = CHECKLIST_CATEGORIES.find(c => c.items.some(i => i.id === item.id));
+                        const categoryInfo = ALL_MATERIALS.find(m => m.title === activeMaterialId)?.categories.find(c => c.items.some(i => i.id === item.id));
                         const mobileLabel = categoryInfo ? `[${categoryInfo.title}] ${item.label}` : item.label;
                           
                         return (
@@ -795,8 +1083,8 @@ function App() {
                               type="checkbox"
                               title={tooltip}
                               className="check-toggle"
-                              checked={isChecked}
-                              onChange={() => toggleProgress(student.id, student.name, item.id, isChecked)}
+                              checked={!!isChecked}
+                              onChange={() => toggleProgress(student.id, student.name, activeLesson, item.id, !!isChecked)}
                             />
                           </td>
                         );
@@ -1043,22 +1331,201 @@ function App() {
         </div>
       )}
 
+      {/* Bulk Assign Modal */}
+      {showBulkAssignModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
+          <div className="card fade-in" style={{ width: '850px', maxWidth: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', backgroundColor: 'var(--bg-primary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>과제 일괄 배정</h2>
+              <button onClick={() => setShowBulkAssignModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1.5rem', flex: 1, overflow: 'hidden', flexWrap: 'wrap' }}>
+              {/* Left Column: Students Selection */}
+              <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0.8rem', borderRight: '1px solid var(--border-color)', paddingRight: '1rem', height: '100%' }}>
+                <h3 style={{ fontSize: '1rem', margin: 0 }}>학생 선택</h3>
+                
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <select 
+                    className="select" style={{ flex: 1, padding: '0.3rem' }}
+                    value={bulkAssignSchoolFilter} 
+                    onChange={e => setBulkAssignSchoolFilter(e.target.value)}
+                  >
+                    {SCHOOLS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select 
+                    className="select" style={{ flex: 1, padding: '0.3rem' }}
+                    value={bulkAssignGradeFilter} 
+                    onChange={e => setBulkAssignGradeFilter(e.target.value)}
+                  >
+                    {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                    <input 
+                      type="checkbox"
+                      checked={
+                        students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter)).length > 0 &&
+                        students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter))
+                          .every(s => bulkAssignSelectedStudents.includes(s.id))
+                      }
+                      onChange={(e) => {
+                        const filteredIds = students
+                          .filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter))
+                          .map(s => s.id);
+                        if (e.target.checked) {
+                          setBulkAssignSelectedStudents(prev => Array.from(new Set([...prev, ...filteredIds])));
+                        } else {
+                          setBulkAssignSelectedStudents(prev => prev.filter(id => !filteredIds.includes(id)));
+                        }
+                      }}
+                    />
+                    전체 선택
+                  </label>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{bulkAssignSelectedStudents.length}명 선택됨</span>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0.5rem' }}>
+                  {students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(student => (
+                    <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox"
+                        checked={bulkAssignSelectedStudents.includes(student.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setBulkAssignSelectedStudents(prev => [...prev, student.id]);
+                          } else {
+                            setBulkAssignSelectedStudents(prev => prev.filter(id => id !== student.id));
+                          }
+                        }}
+                      />
+                      {student.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({student.school} {student.grade})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Column: Tasks Selection */}
+              <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: '0.8rem', height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '1rem', margin: 0 }}>과제 선택</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>과정:</span>
+                    <select 
+                      className="select" 
+                      style={{ padding: '0.3rem 0.5rem' }}
+                      value={bulkAssignLesson}
+                      onChange={e => setBulkAssignLesson(e.target.value)}
+                    >
+                      {LESSONS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '1rem', backgroundColor: 'var(--bg-secondary)' }}>
+                  {EXAM_MATERIALS.map(material => (
+                    <div key={material.title} style={{ marginBottom: '1.2rem', padding: '1rem', backgroundColor: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--accent-blue)', fontSize: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem' }}>{material.title}</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
+                        {material.categories.flatMap(cat => cat.items).map(item => (
+                          <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', padding: '0.3rem', borderRadius: '4px', width: '100%' }}>
+                            <input 
+                              type="checkbox"
+                              checked={bulkAssignSelectedItems.includes(item.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setBulkAssignSelectedItems(prev => [...prev, item.id]);
+                                else setBulkAssignSelectedItems(prev => prev.filter(id => id !== item.id));
+                              }}
+                            />
+                            <span style={{ flex: 1, wordBreak: 'keep-all', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Custom Tasks Section inside Bulk Modal */}
+                  <div style={{ marginBottom: '1.2rem', padding: '1rem', backgroundColor: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '1.2rem' }}>
+                    <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--accent-blue)', fontSize: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem' }}>선생님 과제 (개별) 일괄 배정</h4>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ flex: 1 }}
+                        placeholder="새 과제 (예: 단어 재시험)"
+                        value={bulkAssignNewCustomTask}
+                        onChange={e => setBulkAssignNewCustomTask(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.85rem', whiteSpace: 'nowrap', padding: '0.4rem 1rem' }}
+                        onClick={() => {
+                          if (!bulkAssignNewCustomTask.trim()) return;
+                          const label = bulkAssignNewCustomTask.trim();
+                          const id = `custom_${label}`;
+                          if (!bulkAssignCustomTasksList.some(t => t.id === id)) {
+                            setBulkAssignCustomTasksList(prev => [...prev, { id, label }]);
+                          }
+                          setBulkAssignNewCustomTask("");
+                        }}
+                      >추가</button>
+                    </div>
+                    {bulkAssignCustomTasksList.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
+                        {bulkAssignCustomTasksList.map(task => (
+                          <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', padding: '0.3rem', borderRadius: '4px', width: '100%', backgroundColor: 'rgba(33, 150, 243, 0.05)', border: '1px solid rgba(33, 150, 243, 0.2)' }}>
+                            <span style={{ color: 'var(--accent-blue)', marginRight: '0.3rem' }}>✓</span>
+                            <span style={{ flex: 1, wordBreak: 'keep-all', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => setBulkAssignCustomTasksList(prev => prev.filter(t => t.id !== task.id))}
+                              style={{ background: 'none', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' }}
+                            >×</button>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ padding: '0.6rem 2rem', fontSize: '1rem' }}
+                onClick={handleBulkAssign}
+              >
+                선택한 학생(들)에게 배정하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
         {/* Edit Student Popup */}
         {editingStudentId && editPopupPosition && (
-          <div 
-            className="card fade-in" 
-            style={{ 
-              position: 'fixed', 
-              top: editPopupPosition.top, 
-              left: editPopupPosition.left, 
-              width: '280px', 
-              zIndex: 9999, 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-              border: '1px solid var(--border-color)',
-              padding: '1.2rem'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
+            <div 
+              className="card fade-in" 
+              style={{ 
+                width: '500px', 
+                maxWidth: '90vw',
+                maxHeight: '85vh',
+                overflowY: 'auto',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                border: '1px solid var(--border-color)',
+                padding: '1.5rem',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>학생 정보 수정</h3>
               <button 
@@ -1103,6 +1570,113 @@ function App() {
                     required
                   />
                 </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                    <label style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>학생 할당 과제</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>과정 선택:</span>
+                      <select 
+                        value={editPopupLesson}
+                        onChange={e => setEditPopupLesson(e.target.value)}
+                        className="input-field"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.85rem', width: 'auto' }}
+                      >
+                        {LESSONS.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1, minHeight: '200px', maxHeight: '45vh', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.8rem' }}>
+                    {EXAM_MATERIALS.map(material => (
+                      <div key={material.title} style={{ marginBottom: '1rem' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent-blue)', fontSize: '0.95rem' }}>{material.title}</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.5rem' }}>
+                          {material.categories.flatMap(cat => cat.items).map(item => {
+                            const assignKey = `${editPopupLesson}_${item.id}`;
+                            return (
+                              <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                                <input 
+                                  type="checkbox"
+                                  checked={editStudentAssignedItems.includes(assignKey)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setEditStudentAssignedItems(prev => [...prev, assignKey]);
+                                    } else {
+                                      setEditStudentAssignedItems(prev => prev.filter(k => k !== assignKey));
+                                    }
+                                  }}
+                                />
+                                {item.label}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent-blue)', fontSize: '0.95rem' }}>선생님 과제 (개별)</h4>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="새 과제"
+                          value={newCustomTask}
+                          onChange={e => setNewCustomTask(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                          onClick={() => {
+                            if (!newCustomTask.trim()) return;
+                            const label = newCustomTask.trim();
+                            const id = `custom_${label}`;
+                            const assignKey = `${editPopupLesson}_${id}`;
+                            
+                            setEditStudentCustomTasks(prev => {
+                              if (!prev.some(t => t.id === id && t.lesson === editPopupLesson)) {
+                                return [...prev, { id, label, lesson: editPopupLesson }];
+                              }
+                              return prev;
+                            });
+
+                            if (!editStudentAssignedItems.includes(assignKey)) {
+                               setEditStudentAssignedItems(prev => [...prev, assignKey]);
+                            }
+                            setNewCustomTask("");
+                          }}
+                        >
+                          추가
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.5rem' }}>
+                         {editStudentCustomTasks.filter(t => t.lesson === editPopupLesson).map(task => {
+                           const assignKey = `${editPopupLesson}_${task.id}`;
+                           return (
+                             <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', width: '100%' }}>
+                               <input 
+                                 type="checkbox"
+                                 checked={editStudentAssignedItems.includes(assignKey)}
+                                 onChange={(e) => {
+                                   if (e.target.checked) {
+                                     setEditStudentAssignedItems(prev => [...prev, assignKey]);
+                                   } else {
+                                     setEditStudentAssignedItems(prev => prev.filter(k => k !== assignKey));
+                                   }
+                                 }}
+                               />
+                               <span style={{ flex: 1 }}>{task.label}</span>
+                               <button type="button" onClick={() => {
+                                   setEditStudentCustomTasks(prev => prev.filter(t => t.id !== task.id || t.lesson !== editPopupLesson));
+                                   setEditStudentAssignedItems(prev => prev.filter(k => k !== assignKey));
+                               }} style={{background:'none', border:'none', color:'var(--accent-red)', cursor:'pointer', fontSize:'0.75rem', padding: '0 0.5rem'}}>삭제</button>
+                             </label>
+                           );
+                         })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
                   <button 
                     type="button" 
@@ -1136,6 +1710,7 @@ function App() {
                   </div>
                 </div>
               </form>
+            </div>
           </div>
         )}
 
