@@ -79,20 +79,20 @@ export const EXAM_MATERIALS: ExamMaterial[] = [
         items: [{ id: "nc_word", label: "word" }]
       },
       {
-        title: "Dialogues",
-        items: [{ id: "nc_dialogues", label: "Dialogues" }]
+        title: "dialog",
+        items: [{ id: "nc_dialogues", label: "dialog" }]
       },
       {
-        title: "Grammar",
-        items: [{ id: "nc_grammar", label: "Grammar" }]
+        title: "grammar",
+        items: [{ id: "nc_grammar", label: "grammar" }]
       },
       {
         title: "Reading연습문제",
         items: [{ id: "nc_read_prac", label: "Reading연습문제" }]
       },
       {
-        title: "Reading실전문제",
-        items: [{ id: "nc_read_real", label: "Reading실전문제" }]
+        title: "Reading 실전문제",
+        items: [{ id: "nc_read_real", label: "Reading 실전문제" }]
       },
       {
         title: "실전모의고사 Basic1",
@@ -198,45 +198,59 @@ export const EXAM_MATERIALS: ExamMaterial[] = [
     title: "exam4you",
     categories: [
       {
-        title: 'word test',
+        title: "01. 예상문제",
         items: [
-          { id: 'word_1', label: '뜻시험' },
-          { id: 'word_2', label: '영어시험' },
-          { id: 'word_3', label: '예문시험' },
-          { id: 'word_4', label: '영영풀이' },
-          { id: 'word_5', label: '다의어' },
+          { id: "e4_expected_pre", label: "예상문제 PRE-STEP" },
+          { id: "e4_expected_1", label: "예상문제 1회" },
+          { id: "e4_expected_2", label: "예상문제 2회" },
         ]
       },
       {
-        title: '본문 & 내용이해',
+        title: "02. 교과서본문",
         items: [
-          { id: 'textbook', label: '본문학습' },
-          { id: 'comprehension', label: '내용이해 T/F' },
-          { id: 'workbook_3', label: 'Part 3 동사형' },
-          { id: 'workbook_4', label: 'Part 4 어법' },
-          { id: 'workbook_6', label: 'Part 6 순서배열' },
-          { id: 'workbook_7', label: 'Part 7 영작' },
+          { id: "e4_textbook", label: "본문" },
         ]
       },
       {
-        title: '형성평가',
+        title: "03. word test",
         items: [
-          { id: 'eval_0', label: '0단계 pre-step' },
-          { id: 'eval_1', label: '1단계 BASIC' },
-          { id: 'eval_2', label: '2단계 ACTUAL' },
+          { id: "e4_word_1", label: "뜻시험" },
+          { id: "e4_word_2", label: "영어시험" },
+          { id: "e4_word_3", label: "알맞은 영어단어 넣기(예문)" },
+          { id: "e4_word_4", label: "영영풀이" },
+          { id: "e4_word_5", label: "다의어" },
         ]
       },
       {
-        title: 'GRAMMAR BUILD UP',
+        title: "04. 내용정리 플러스",
         items: [
-          { id: 'grammar_subj', label: '주관식' },
-          { id: 'grammar_obj', label: '객관식' },
+          { id: "e4_content_1", label: "Dialogue - 표현점검(알맞은 단어넣기 / 고르기)" },
+          { id: "e4_content_2", label: "Dialogue - 내용점검(T/F, 알맞은 단어 고르기)" },
+          { id: "e4_content_3", label: "Dialogue - 빈칸완성(단어 채우기)" },
+          { id: "e4_content_4", label: "본문 - 내용점검" },
+          { id: "e4_content_5", label: "본문 - 빈칸완성(단어 채우기)" },
+          { id: "e4_content_6", label: "본문 - 어법점검(어색한 부분찾아 고치기 / 일치하지 않는곳 찾아 고치기)" },
         ]
       },
       {
-        title: 'FINAL',
+        title: "05. 본문 10단계 워크북",
         items: [
-          { id: 'final', label: '내신기출FINAL' },
+          { id: "e4_wb_all", label: "본문 10단계 워크북 통합본(1~10)" },
+          { id: "e4_wb_1", label: "본문 10단계 워크북 1_본문해석시_단계별" },
+          { id: "e4_wb_2", label: "본문 10단계 워크북 2_빈칸연습 (우리말)_단계별" },
+          { id: "e4_wb_3", label: "본문 10단계 워크북 3_빈칸연습 (영어)_단계별" },
+          { id: "e4_wb_4", label: "본문 10단계 워크북 4_해석연습_단계별" },
+          { id: "e4_wb_5", label: "본문 10단계 워크북 _동사형 연습_단계별" },
+          { id: "e4_wb_6", label: "본문 10단계 워크북 6_어법 선택형 연습_단계별" },
+          { id: "e4_wb_7", label: "본문 10단계 워크북 7_어색한 곳 찾기 연습_단계별" },
+        ]
+      },
+      {
+        title: "06. Grammar build up",
+        items: [
+          { id: "e4_grammar_wb", label: "워크북" },
+          { id: "e4_grammar_obj", label: "객관식" },
+          { id: "e4_grammar_subj", label: "주관식" },
         ]
       }
     ]
