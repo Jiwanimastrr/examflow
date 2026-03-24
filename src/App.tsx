@@ -95,6 +95,7 @@ function App() {
   const [bulkAssignSelectedItems, setBulkAssignSelectedItems] = useState<string[]>([]);
   const [bulkAssignSchoolFilter, setBulkAssignSchoolFilter] = useState('전체');
   const [bulkAssignGradeFilter, setBulkAssignGradeFilter] = useState('전체');
+  const [bulkAssignClassFilter, setBulkAssignClassFilter] = useState('전체');
   const [bulkAssignNewCustomTask, setBulkAssignNewCustomTask] = useState('');
   const [bulkAssignCustomTasksList, setBulkAssignCustomTasksList] = useState<{id: string, label: string}[]>([]);
 
@@ -496,32 +497,9 @@ function App() {
     }
   };
 
-  const handleManualSync = async () => {
-    try {
-      console.log('수동 동기화 시작...');
-      const promises: Promise<void>[] = [];
-      
-      // Sync all students
-      students.forEach(student => {
-        promises.push(setDoc(doc(db, 'students', student.id), student));
-      });
-      // Sync all exam dates
-      examDates.forEach(dateReq => {
-        promises.push(setDoc(doc(db, 'exam_dates', `${dateReq.school}_${dateReq.grade}`), dateReq));
-      });
-      
-      await Promise.all(promises);
-      console.log('수동 동기화 완료');
-    } catch (error) {
-      console.error("수동 동기화 실패:", error);
-      alert("동기화 중 오류가 발생했습니다.");
-    }
-  };
-
   const handleLogout = async () => {
-    await handleManualSync();
-    logActivity(currentUser, '전체 데이터 동기화 및 로그아웃');
-    alert("모든 데이터가 안전하게 서버에 동기화(저장)되었습니다. 로그아웃합니다.");
+    logActivity(currentUser, '로그아웃');
+    alert("안전하게 로그아웃 되었습니다.");
     setCurrentUser('');
   };
 
@@ -848,9 +826,7 @@ function App() {
             <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               접속자: <strong>{currentUser}</strong>
             </span>
-            <button onClick={handleManualSync} className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--accent-blue)', color: 'var(--accent-blue)' }}>
-              수동 동기화
-            </button>
+
             <button onClick={handleLogout} className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
               로그아웃
             </button>
@@ -1490,6 +1466,13 @@ function App() {
                   >
                     {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
+                  <select 
+                    className="select" style={{ flex: 1, padding: '0.3rem' }}
+                    value={bulkAssignClassFilter} 
+                    onChange={e => setBulkAssignClassFilter(e.target.value)}
+                  >
+                    {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }}>
@@ -1497,13 +1480,13 @@ function App() {
                     <input 
                       type="checkbox"
                       checked={
-                        students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter)).length > 0 &&
-                        students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter))
+                        students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter) && (bulkAssignClassFilter === '전체' || s.studentClass === bulkAssignClassFilter)).length > 0 &&
+                        students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter) && (bulkAssignClassFilter === '전체' || s.studentClass === bulkAssignClassFilter))
                           .every(s => bulkAssignSelectedStudents.includes(s.id))
                       }
                       onChange={(e) => {
                         const filteredIds = students
-                          .filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter))
+                          .filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter) && (bulkAssignClassFilter === '전체' || s.studentClass === bulkAssignClassFilter))
                           .map(s => s.id);
                         if (e.target.checked) {
                           setBulkAssignSelectedStudents(prev => Array.from(new Set([...prev, ...filteredIds])));
@@ -1518,7 +1501,7 @@ function App() {
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0.5rem' }}>
-                  {students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter))
+                  {students.filter(s => (bulkAssignSchoolFilter === '전체' || s.school === bulkAssignSchoolFilter) && (bulkAssignGradeFilter === '전체' || s.grade === bulkAssignGradeFilter) && (bulkAssignClassFilter === '전체' || s.studentClass === bulkAssignClassFilter))
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map(student => (
                     <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem', cursor: 'pointer' }}>
