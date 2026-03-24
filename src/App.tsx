@@ -541,6 +541,13 @@ function App() {
         if (!student) return;
 
         const currentAssigned = student.assignedItems || [];
+        
+        const filteredAssigned = currentAssigned.filter(item => {
+          if (!item.startsWith(`${bulkAssignLesson}_`)) return true;
+          if (item.startsWith(`${bulkAssignLesson}_custom_`)) return true;
+          return false;
+        });
+
         const newAssignedItems = bulkAssignSelectedItems.map(itemId => `${bulkAssignLesson}_${itemId}`);
         
         let updatedCustomTasks = student.customTasks ? [...student.customTasks] : [];
@@ -553,7 +560,7 @@ function App() {
           newCustomTaskKeys.push(`${bulkAssignLesson}_${task.id}`);
         });
 
-        const updatedAssigned = Array.from(new Set([...currentAssigned, ...newAssignedItems, ...newCustomTaskKeys]));
+        const updatedAssigned = Array.from(new Set([...filteredAssigned, ...newAssignedItems, ...newCustomTaskKeys]));
         
         batch.update(doc(db, 'students', studentId), {
           assignedItems: updatedAssigned,
@@ -1429,7 +1436,24 @@ function App() {
                 <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '1rem', backgroundColor: 'var(--bg-secondary)' }}>
                   {EXAM_MATERIALS.map(material => (
                     <div key={material.title} style={{ marginBottom: '1.2rem', padding: '1rem', backgroundColor: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--accent-blue)', fontSize: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem' }}>{material.title}</h4>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.3rem', marginBottom: '0.8rem' }}>
+                        <h4 style={{ margin: 0, color: 'var(--accent-blue)', fontSize: '1rem' }}>{material.title}</h4>
+                        <label style={{ fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--text-secondary)' }}>
+                          <input 
+                            type="checkbox"
+                            checked={material.categories.flatMap(c => c.items).every(i => bulkAssignSelectedItems.includes(i.id)) && material.categories.flatMap(c => c.items).length > 0}
+                            onChange={(e) => {
+                              const itemIds = material.categories.flatMap(c => c.items).map(i => i.id);
+                              if (e.target.checked) {
+                                setBulkAssignSelectedItems(prev => Array.from(new Set([...prev, ...itemIds])));
+                              } else {
+                                setBulkAssignSelectedItems(prev => prev.filter(id => !itemIds.includes(id)));
+                              }
+                            }}
+                          />
+                          전체 선택
+                        </label>
+                      </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem' }}>
                         {material.categories.flatMap(cat => cat.items).map(item => (
                           <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', padding: '0.3rem', borderRadius: '4px', width: '100%' }}>
@@ -1589,7 +1613,24 @@ function App() {
                   <div style={{ flex: 1, minHeight: '200px', maxHeight: '45vh', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.8rem' }}>
                     {EXAM_MATERIALS.map(material => (
                       <div key={material.title} style={{ marginBottom: '1rem' }}>
-                        <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent-blue)', fontSize: '0.95rem' }}>{material.title}</h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <h4 style={{ margin: 0, color: 'var(--accent-blue)', fontSize: '0.95rem' }}>{material.title}</h4>
+                          <label style={{ fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--text-secondary)' }}>
+                            <input 
+                              type="checkbox"
+                              checked={material.categories.flatMap(c => c.items).every(i => editStudentAssignedItems.includes(`${editPopupLesson}_${i.id}`)) && material.categories.flatMap(c => c.items).length > 0}
+                              onChange={(e) => {
+                                const assignKeys = material.categories.flatMap(c => c.items).map(i => `${editPopupLesson}_${i.id}`);
+                                if (e.target.checked) {
+                                  setEditStudentAssignedItems(prev => Array.from(new Set([...prev, ...assignKeys])));
+                                } else {
+                                  setEditStudentAssignedItems(prev => prev.filter(k => !assignKeys.includes(k)));
+                                }
+                              }}
+                            />
+                            전체 선택
+                          </label>
+                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.5rem' }}>
                           {material.categories.flatMap(cat => cat.items).map(item => {
                             const assignKey = `${editPopupLesson}_${item.id}`;
