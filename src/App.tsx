@@ -1434,11 +1434,12 @@ function App() {
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.4' }}>
               복수 학생의 정보를 한 줄로 입력하여 여러 명을 동시에 등록할 수 있습니다.<br/>
               <strong>형식:</strong> 이름 학교 학년 반 (공백, 쉼표 또는 탭으로 구분)<br/>
+              <strong style={{ color: '#d32f2f' }}>주의:</strong> 반 이름에 영어가 들어갈 경우 반드시 <strong>대문자</strong>로 입력해주세요.<br/>
               <strong>예시:</strong><br/>
               <span style={{ display: 'block', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '4px', marginTop: '0.3rem', fontFamily: 'monospace' }}>
-                홍길동 단대부고 1학년 A반<br/>
-                이몽룡 경기고 2학년 특별반<br/>
-                성춘향 숙명여고 3학년
+                지드래곤 단대부고 1학년 A반<br/>
+                아이유 경기고 2학년 B반<br/>
+                장원영 숙명여고 3학년
               </span>
             </p>
             <textarea
