@@ -81,9 +81,13 @@ function App() {
   const [editStudentName, setEditStudentName] = useState('');
   const [editStudentSchool, setEditStudentSchool] = useState('');
   const [editStudentGrade, setEditStudentGrade] = useState('');
+  const [editStudentClass, setEditStudentClass] = useState('');
   const [editStudentAssignedItems, setEditStudentAssignedItems] = useState<string[]>([]);
   const [editPopupPosition, setEditPopupPosition] = useState<{ top: number, left: number } | null>(null);
   const [editPopupLesson, setEditPopupLesson] = useState(LESSONS[0]);
+
+  const [showBulkAddModal, setShowBulkAddModal] = useState(false);
+  const [bulkAddInput, setBulkAddInput] = useState('');
 
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const [bulkAssignSelectedStudents, setBulkAssignSelectedStudents] = useState<string[]>([]);
@@ -97,6 +101,7 @@ function App() {
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
   const [newStudentGrade, setNewStudentGrade] = useState(GRADES[1]); // default to first real grade
+  const [newStudentClass, setNewStudentClass] = useState('');
   
   const [newCustomTask, setNewCustomTask] = useState("");
   const [editStudentCustomTasks, setEditStudentCustomTasks] = useState<{id: string, label: string, lesson?: string}[]>([]);
@@ -104,6 +109,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSchool, setFilterSchool] = useState(SCHOOLS[0]); // default '전체'
   const [filterGrade, setFilterGrade] = useState(GRADES[0]); // default '전체'
+  const [filterClass, setFilterClass] = useState('전체');
 
   const [selectedStudentIdForComments, setSelectedStudentIdForComments] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
@@ -182,6 +188,54 @@ function App() {
     }
   };
 
+  const handleBulkAddStudents = async () => {
+    if (!bulkAddInput.trim()) return;
+    
+    const lines = bulkAddInput.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return;
+
+    if (!window.confirm(`총 ${lines.length}명의 학생을 일괄 등록하시겠습니까?`)) return;
+
+    try {
+      const batch = writeBatch(db);
+      let addedCount = 0;
+
+      for (const line of lines) {
+        const parts = line.trim().split(/[\s,]+/).filter(Boolean);
+        if (parts.length < 1) continue;
+        
+        const name = parts[0];
+        const school = parts.length > 1 ? parts[1] : SCHOOLS[1];
+        const grade = parts.length > 2 ? parts[2] : GRADES[1];
+        const studentClass = parts.length > 3 ? parts.slice(3).join(' ') : ''; 
+
+        const newId = crypto.randomUUID();
+        const newStudent: Student = {
+          id: newId,
+          name,
+          school,
+          grade,
+          studentClass,
+          progress: {},
+          assignedItems: LESSONS.flatMap(l => ALL_CHECKLIST_ITEMS.map(i => `${l}_${i.id}`)),
+        };
+
+        const docRef = doc(db, 'students', newId);
+        batch.set(docRef, newStudent);
+        addedCount++;
+      }
+
+      await batch.commit();
+      logActivity(currentUser, `학생 ${addedCount}명 일괄 등록`);
+      setBulkAddInput('');
+      setShowBulkAddModal(false);
+      alert(`${addedCount}명의 학생이 추가되었습니다.`);
+    } catch (error) {
+      console.error("Error in bulk add students:", error);
+      alert("학생 일괄 등록 중 오류가 발생했습니다.");
+    }
+  };
+
   const addStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newStudentName.trim();
@@ -193,6 +247,7 @@ function App() {
       name,
       school: newStudentSchool,
       grade: newStudentGrade,
+      studentClass: newStudentClass.trim(),
       progress: {},
       assignedItems: LESSONS.flatMap(l => ALL_CHECKLIST_ITEMS.map(i => `${l}_${i.id}`)),
     };
@@ -200,6 +255,7 @@ function App() {
     try {
       await setDoc(doc(db, 'students', newId), newStudent);
       setNewStudentName('');
+      setNewStudentClass('');
       logActivity(currentUser, `학생 '${name}' 추가`);
     } catch (error) {
       console.error("Error adding student:", error);
@@ -224,6 +280,7 @@ function App() {
     setEditStudentName(student.name);
     setEditStudentSchool(student.school);
     setEditStudentGrade(student.grade);
+    setEditStudentClass(student.studentClass || '');
     
     let normalizedAssigns: string[];
     if (student.assignedItems) {
@@ -265,6 +322,7 @@ function App() {
         name: editStudentName.trim(),
         school: editStudentSchool,
         grade: editStudentGrade,
+        studentClass: editStudentClass.trim(),
         assignedItems: editStudentAssignedItems,
         customTasks: editStudentCustomTasks
       });
@@ -745,10 +803,13 @@ function App() {
     );
   }
 
+  const availableClasses = ["전체", ...Array.from(new Set(students.map(s => s.studentClass).filter(c => c && c.trim() !== ''))).sort()];
+
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSchool = filterSchool === '전체' || student.school === filterSchool;
     const matchesGrade = filterGrade === '전체' || student.grade === filterGrade;
+    const matchesClass = filterClass === '전체' || student.studentClass === filterClass;
     
     // Filter out students who have 0 assigned items matching the current active tab
     const activeMaterial = ALL_MATERIALS.find(m => m.title === activeMaterialId);
@@ -757,7 +818,7 @@ function App() {
     );
     
     const isSearching = searchQuery.trim().length > 0;
-    return matchesSearch && matchesSchool && matchesGrade && (hasAnyActiveItem || isSearching);
+    return matchesSearch && matchesSchool && matchesGrade && matchesClass && (hasAnyActiveItem || isSearching);
   });
 
   const studentsWithProgress = students.map(student => ({
@@ -810,6 +871,12 @@ function App() {
           </button>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button 
+              onClick={() => setShowBulkAddModal(true)} 
+              className="btn" 
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--accent-gold, #2e7d32)', color: 'white', border: 'none' }}>
+              학생 일괄 등록
+            </button>
+            <button 
               onClick={() => setShowBulkAssignModal(true)} 
               className="btn" 
               style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: 'var(--accent-blue)', color: 'white', border: 'none' }}>
@@ -840,6 +907,14 @@ function App() {
             placeholder="새로운 학생 이름..."
             value={newStudentName}
             onChange={(e) => setNewStudentName(e.target.value)}
+          />
+          <input
+            type="text"
+            className="input"
+            style={{ width: '100px', flex: 'none' }}
+            placeholder="Class"
+            value={newStudentClass}
+            onChange={(e) => setNewStudentClass(e.target.value)}
           />
           <select 
             className="select" 
@@ -889,6 +964,15 @@ function App() {
           >
             {GRADES.map(grade => (
                <option key={grade} value={grade}>{grade}</option>
+            ))}
+          </select>
+          <select 
+            className="select" 
+            value={filterClass} 
+            onChange={(e) => setFilterClass(e.target.value)}
+          >
+            {availableClasses.map(c => (
+               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </div>
@@ -947,7 +1031,7 @@ function App() {
               <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
                 {top3Students.filter(s => filteredStudents.some(fs => fs.id === s.id)).slice(0, 3).map((s) => (
                   <li key={s.id}>
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#2e7d32' }}>{s.progressData.currentMaterialPct}%</strong>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}{s.studentClass ? ` - ${s.studentClass}` : ''}) - <strong style={{ color: '#2e7d32' }}>{s.progressData.currentMaterialPct}%</strong>
                   </li>
                 ))}
               </ol>
@@ -961,7 +1045,7 @@ function App() {
               <ol style={{ margin: 0, paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
                 {bottom3Students.filter(s => filteredStudents.some(fs => fs.id === s.id)).slice(0, 3).map((s) => (
                   <li key={s.id}>
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}) - <strong style={{ color: '#c62828' }}>{s.progressData.currentMaterialPct}%</strong>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{s.name}</span> ({s.school} {s.grade}{s.studentClass ? ` - ${s.studentClass}` : ''}) - <strong style={{ color: '#c62828' }}>{s.progressData.currentMaterialPct}%</strong>
                   </li>
                 ))}
               </ol>
@@ -1013,6 +1097,7 @@ function App() {
                               title="클릭하여 학생 정보 수정"
                             >
                               {student.name}
+                              {student.studentClass ? <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '0.3rem', fontWeight: 'normal' }}>({student.studentClass})</span> : null}
                             </span>
                             <span 
                               style={{ fontSize: '0.8rem', color: 'var(--accent-blue)', position: 'relative', cursor: 'pointer' }}
@@ -1107,8 +1192,8 @@ function App() {
 
       {/* Login History Modal */}
       {showLoginHistoryModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}} onClick={() => { setShowLoginHistoryModal(false); setSelectedHistoryTeacher(null); }}>
+          <div className="card fade-in" style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>
                 {selectedHistoryTeacher ? `'${selectedHistoryTeacher}' 선생님 활동 내역` : '최근 접속 및 활동 기록'}
@@ -1156,8 +1241,8 @@ function App() {
 
       {/* Exam Date Modal */}
       {showExamDateModal && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '450px', maxHeight: '80vh', overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}} onClick={() => setShowExamDateModal(false)}>
+          <div className="card fade-in" style={{ width: '450px', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', position: 'sticky', top: 0, backgroundColor: 'var(--bg-primary)', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', zIndex: 10 }}>
               <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>학교/학년별 시험 기간 설정</h2>
               <button onClick={() => setShowExamDateModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
@@ -1198,8 +1283,8 @@ function App() {
 
       {/* Reset All Modal */}
       {showResetModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '400px', textAlign: 'center' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}} onClick={() => { setShowResetModal(false); setResetConfirmText(''); }}>
+          <div className="card fade-in" style={{ width: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--accent-red)' }}>⚠️ 전체 진행도 리셋</h2>
             <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
               모든 학생의 체크리스트 진행 상황이 <strong>0%로 완전히 초기화</strong>됩니다.<br />
@@ -1245,8 +1330,8 @@ function App() {
 
       {/* Delete All Students Modal */}
       {showDeleteAllModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '400px', textAlign: 'center' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}} onClick={() => { setShowDeleteAllModal(false); setDeleteAllConfirmText(''); }}>
+          <div className="card fade-in" style={{ width: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--accent-red)' }}>🚨 학생 전체 영구 삭제</h2>
             <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
               등록된 <strong>모든 학생 데이터가 데이터베이스에서 영구히 삭제</strong>됩니다.<br />
@@ -1292,8 +1377,8 @@ function App() {
 
       {/* Student Comments Modal */}
       {selectedStudentIdForComments && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}} onClick={() => { setSelectedStudentIdForComments(null); setNewCommentText(''); }}>
+          <div className="card fade-in" style={{ width: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>
                 {students.find(s => s.id === selectedStudentIdForComments)?.name} 선생님 코멘트 💬
@@ -1338,10 +1423,47 @@ function App() {
         </div>
       )}
 
+      {/* Bulk Add Student Modal */}
+      {showBulkAddModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}} onClick={() => setShowBulkAddModal(false)}>
+          <div className="card fade-in" style={{ width: '600px', maxWidth: '90vw', padding: '2rem' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text-primary)' }}>학생 일괄 등록</h2>
+              <button onClick={() => setShowBulkAddModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>×</button>
+            </div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.4' }}>
+              복수 학생의 정보를 한 줄로 입력하여 여러 명을 동시에 등록할 수 있습니다.<br/>
+              <strong>형식:</strong> 이름 학교 학년 반 (공백, 쉼표 또는 탭으로 구분)<br/>
+              <strong>예시:</strong><br/>
+              <span style={{ display: 'block', backgroundColor: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '4px', marginTop: '0.3rem', fontFamily: 'monospace' }}>
+                홍길동 단대부고 1학년 A반<br/>
+                이몽룡 경기고 2학년 특별반<br/>
+                성춘향 숙명여고 3학년
+              </span>
+            </p>
+            <textarea
+              className="input-field"
+              style={{ width: '100%', height: '200px', padding: '1rem', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.9rem' }}
+              placeholder="여기에 학생 리스트를 붙여넣으세요..."
+              value={bulkAddInput}
+              onChange={(e) => setBulkAddInput(e.target.value)}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem' }}>
+              <button className="btn" style={{ padding: '0.6rem 1.2rem' }} onClick={() => setShowBulkAddModal(false)}>
+                취소
+              </button>
+              <button className="btn btn-primary" style={{ padding: '0.6rem 1.2rem', backgroundColor: '#2e7d32', border: 'none' }} onClick={handleBulkAddStudents}>
+                등록하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Assign Modal */}
       {showBulkAssignModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}}>
-          <div className="card fade-in" style={{ width: '850px', maxWidth: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000}} onClick={() => setShowBulkAssignModal(false)}>
+          <div className="card fade-in" style={{ width: '850px', maxWidth: '95vw', height: '85vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', backgroundColor: 'var(--bg-primary)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 className="title" style={{ fontSize: '1.2rem', marginBottom: 0 }}>과제 일괄 배정</h2>
               <button onClick={() => setShowBulkAssignModal(false)} className="btn" style={{ padding: '0.3rem 0.6rem' }}>닫기</button>
@@ -1592,6 +1714,16 @@ function App() {
                     placeholder="학생 이름" 
                     className="input-field"
                     required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Class</label>
+                  <input 
+                    type="text" 
+                    value={editStudentClass} 
+                    onChange={e => setEditStudentClass(e.target.value)} 
+                    placeholder="Class 직접 입력" 
+                    className="input-field"
                   />
                 </div>
                 <div>

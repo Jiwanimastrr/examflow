@@ -31,6 +31,7 @@ export interface Student {
   name: string;
   school: string;
   grade: string;
+  studentClass?: string;
   progress: Record<string, StudentProgress>;
   comments?: StudentComment[];
   assignedItems?: string[]; // Array of checklist item IDs the student needs to complete

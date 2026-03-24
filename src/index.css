@@ -251,8 +251,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Glass Table Container */
 .tracker-container {
   overflow-x: auto;
-  overflow-y: auto;
-  max-height: 600px; /* Enable vertical scroll inside container */
+  /* Removed max-height to allow full page scroll */
   border-radius: var(--radius-xl);
   background: var(--bg-secondary);
   box-shadow: var(--shadow-elevated);
