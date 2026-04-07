@@ -587,3 +587,26 @@ h1, h2, h3, h4, h5, h6 {
     gap: 1rem !important;
   }
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .container {
+    display: none !important;
+  }
+  body, html {
+    background-color: white !important;
+    background-image: none !important;
+  }
+  #print-section {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 2cm;
+    background-color: white;
+  }
+}

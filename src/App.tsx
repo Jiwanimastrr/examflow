@@ -115,6 +115,11 @@ function App() {
   const [selectedStudentIdForComments, setSelectedStudentIdForComments] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
 
+  // Print Report States
+  const [printStudentId, setPrintStudentId] = useState<string | null>(null);
+  const [printSpeed, setPrintSpeed] = useState<string>('보통');
+  const [printComment, setPrintComment] = useState<string>('');
+
   // Firestore realtime listeners
   useEffect(() => {
     // Listen to students
@@ -458,6 +463,16 @@ function App() {
       currentMaterialPct: tabProgressPct,
       overallPct: overallProgressPct
     };
+  };
+
+  const getGradeAverageProgress = (grade: string) => {
+    const gradeStudents = students.filter(s => s.grade === grade);
+    if (gradeStudents.length === 0) return 0;
+    let totalPct = 0;
+    gradeStudents.forEach(s => {
+      totalPct += calculateStudentProgress(s).overallPct;
+    });
+    return Math.round(totalPct / gradeStudents.length);
   };
 
   const migrateLocalDataToFirebase = async (userName: string) => {
@@ -815,7 +830,8 @@ function App() {
   const bottom3Students = sortedByProgressAsc.slice(0, 3);
 
   return (
-    <div className="container fade-in">
+    <>
+      <div className="container fade-in">
       <header className="flex-col items-center justify-center gap-3" style={{ marginBottom: '2.5rem', textAlign: 'center', position: 'relative', width: '100%', overflow: 'hidden' }}>
         <img src={`${import.meta.env.BASE_URL}윌그로우로고.png`} alt="윌그로우 로고" style={{ height: '50px', marginBottom: '0.5rem', objectFit: 'contain' }} />
         <h1 className="title">내신 대비 마스터</h1>
@@ -1085,7 +1101,17 @@ function App() {
                                 <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', backgroundColor: 'var(--accent-red)', borderRadius: '50%', boxShadow: '0 0 4px var(--accent-red-glow)' }} />
                               )}
                             </span>
-                            {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white', cursor: 'default' }}>{dDayText}</span>}
+                            <span 
+                              style={{ fontSize: '0.8rem', cursor: 'pointer', marginLeft: '0.3rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPrintStudentId(student.id);
+                                setPrintSpeed('보통');
+                                setPrintComment('');
+                              }}
+                              title="결과지 인쇄/옵션보기"
+                            >🖨️</span>
+                            {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white', cursor: 'default', marginLeft: '0.3rem' }}>{dDayText}</span>}
                           </span>
                           
                           {/* Current Material Progress */}
@@ -1644,8 +1670,8 @@ function App() {
             <div 
               className="card fade-in" 
               style={{ 
-                width: '500px', 
-                maxWidth: '90vw',
+                width: '800px', 
+                maxWidth: '95vw',
                 maxHeight: '85vh',
                 overflowY: 'auto',
                 boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
@@ -1726,7 +1752,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ flex: 1, minHeight: '200px', maxHeight: '45vh', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.8rem' }}>
+                  <div style={{ flex: 1, border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.8rem' }}>
                     {EXAM_MATERIALS.map(material => (
                       <div key={material.title} style={{ marginBottom: '1rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -1747,7 +1773,7 @@ function App() {
                             전체 선택
                           </label>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.5rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem', paddingLeft: '0.5rem' }}>
                           {material.categories.flatMap(cat => cat.items).map(item => {
                             const assignKey = `${editPopupLesson}_${item.id}`;
                             return (
@@ -1806,7 +1832,7 @@ function App() {
                           추가
                         </button>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.5rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem', paddingLeft: '0.5rem' }}>
                          {editStudentCustomTasks.filter(t => t.lesson === editPopupLesson).map(task => {
                            const assignKey = `${editPopupLesson}_${task.id}`;
                            return (
@@ -1871,7 +1897,107 @@ function App() {
           </div>
         )}
 
-    </div>
+      </div>
+      
+      {/* Print Overlay Modal (No Print) */}
+      {printStudentId && (() => {
+         const pStudent = students.find(s => s.id === printStudentId);
+         if (!pStudent) return null;
+         const myProgress = calculateStudentProgress(pStudent).overallPct;
+         const gradeAvg = getGradeAverageProgress(pStudent.grade);
+         
+         return (
+           <div className="no-print" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}} onClick={() => setPrintStudentId(null)}>
+              <div className="card fade-in" style={{ width: '500px', maxWidth: '95vw', padding: '2rem' }} onClick={e => e.stopPropagation()}>
+                 <h2 className="title" style={{ fontSize: '1.4rem', marginBottom: '1rem' }}>결과지 인쇄</h2>
+                 <div style={{ marginBottom: '1rem' }}>
+                    <strong>{pStudent.name}</strong> ({pStudent.school} {pStudent.grade} {pStudent.studentClass})
+                 </div>
+                 <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', backgroundColor: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px' }}>
+                    <span>종합 달성률: <strong style={{ color: 'var(--accent-blue)', fontSize: '1.2rem' }}>{myProgress}%</strong></span>
+                    <span style={{ color: 'var(--text-secondary)' }}>동학년 평균: {gradeAvg}%</span>
+                 </div>
+                 
+                 <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>푸는 속도 (성실도)</label>
+                    <select className="select" style={{ width: '100%', padding: '0.7rem' }} value={printSpeed} onChange={e => setPrintSpeed(e.target.value)}>
+                       <option value="매우 빠름">매우 빠름</option>
+                       <option value="빠름">빠름</option>
+                       <option value="보통">보통</option>
+                       <option value="느린 편">느린 편</option>
+                       <option value="도움 필요">도움 필요</option>
+                    </select>
+                 </div>
+                 
+                 <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>선생님 코멘트 (선택)</label>
+                    <textarea 
+                      className="input" 
+                      style={{ height: '120px', resize: 'vertical' }}
+                      value={printComment}
+                      onChange={e => setPrintComment(e.target.value)}
+                      placeholder="학부모, 학생에게 전달할 코멘트를 작성해주세요."
+                    />
+                 </div>
+                 
+                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button className="btn" onClick={() => setPrintStudentId(null)}>취소</button>
+                    <button className="btn btn-primary" onClick={() => window.print()}>명세서 인쇄</button>
+                 </div>
+              </div>
+           </div>
+         );
+      })()}
+
+      {/* Actual Print Content Component (Only visible when printing) */}
+      <div id="print-section" style={{ display: 'none' }}>
+        {printStudentId && (() => {
+           const pStudent = students.find(s => s.id === printStudentId);
+           if (!pStudent) return null;
+           const myProgress = calculateStudentProgress(pStudent).overallPct;
+           const gradeAvg = getGradeAverageProgress(pStudent.grade);
+           return (
+             <div style={{ color: 'black', fontFamily: '-apple-system, sans-serif' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid black', paddingBottom: '10px' }}>
+                   <h1 style={{ fontSize: '28px', margin: 0 }}>내신대비 결과 보고서</h1>
+                   <span style={{ fontSize: '18px', display: 'flex', alignItems: 'flex-end' }}>{pStudent.school} {pStudent.grade}</span>
+                 </div>
+                 
+                 <div style={{ marginTop: '20px', fontSize: '20px' }}>
+                   <strong>이름:</strong> <span style={{ fontSize: '24px'}}>{pStudent.name}</span> {pStudent.studentClass && `(${pStudent.studentClass})`}
+                 </div>
+                 
+                 <div style={{ marginTop: '30px', display: 'flex', gap: '20px' }}>
+                   <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
+                     <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>전체 과정 달성률</h3>
+                     <div style={{ fontSize: '40px', fontWeight: 'bold', color: '#007AFF' }}>{myProgress}%</div>
+                     <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+                       (동학년 평균 대비: {myProgress >= gradeAvg ? '+' : ''}{myProgress - gradeAvg}%)
+                     </div>
+                   </div>
+                   
+                   <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
+                     <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>학습 참여 속도 및 성실도</h3>
+                     <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#34C759', marginTop: '10px' }}>{printSpeed}</div>
+                   </div>
+                 </div>
+
+                 <div style={{ marginTop: '30px', border: '1px solid #ddd', padding: '25px', minHeight: '300px', borderRadius: '12px' }}>
+                   <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #eee', paddingBottom: '10px', fontSize: '20px' }}>Tutors' Comment</h3>
+                   <div style={{ fontSize: '18px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+                     {printComment || '이번 시험 대비를 위해 열심히 공부하고 있습니다!'}
+                   </div>
+                 </div>
+                 
+                 <div style={{ marginTop: '60px', textAlign: 'center', color: '#888', fontSize: '14px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+                   윌그로우 내신대비 마스터 시스템
+                 </div>
+             </div>
+           );
+        })()}
+      </div>
+
+    </>
   );
 }
 
