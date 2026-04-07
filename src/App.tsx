@@ -1666,19 +1666,25 @@ function App() {
 
         {/* Edit Student Popup */}
         {editingStudentId && editPopupPosition && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
             <div 
               className="card genie-effect" 
               style={{ 
+                position: 'fixed',
+                top: Math.min(editPopupPosition.top, window.innerHeight - 500),
+                left: editPopupPosition.left + 10 + 900 > window.innerWidth 
+                  ? editPopupPosition.left - 910 
+                  : editPopupPosition.left + 10,
                 width: '900px',
                 maxWidth: '95vw',
-                maxHeight: '85vh',
+                maxHeight: '80vh',
                 overflowY: 'auto',
                 boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
                 border: '1px solid var(--border-color)',
                 padding: '1.5rem',
                 display: 'flex',
                 flexDirection: 'column',
+                transformOrigin: editPopupPosition.left + 10 + 900 > window.innerWidth ? 'top right' : 'top left',
               }}
               onClick={e => e.stopPropagation()}
             >
