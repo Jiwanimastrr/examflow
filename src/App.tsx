@@ -1669,7 +1669,7 @@ function App() {
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
             {(() => {
                 // 정확하게 클릭한 위치(editPopupPosition) 바로 옆에 뜨도록 계산
-                const popW = 550; // 약간 더 슬림하게 줄여서 우측 짤림 방지
+                const popW = 850; // 가로로 넓게 표시
                 
                 // 마우스 클릭 위치보다 살짝 우상단에 기준을 맞춤
                 const popLeft = Math.min(editPopupPosition.left + 20, window.innerWidth - popW - 10);
@@ -1678,7 +1678,7 @@ function App() {
                 const cssStyles: React.CSSProperties = {
                   position: 'absolute',
                   width: `${popW}px`, 
-                  maxWidth: '90vw',
+                  maxWidth: '95vw',
                   maxHeight: '85vh',
                   overflowY: 'auto',
                   boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
