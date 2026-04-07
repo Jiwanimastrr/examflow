@@ -1666,23 +1666,37 @@ function App() {
 
         {/* Edit Student Popup */}
         {editingStudentId && editPopupPosition && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
-            <div 
-              className="card fade-in" 
-              style={{ 
-                width: '800px', 
-                maxWidth: '95vw',
-                maxHeight: '85vh',
-                overflowY: 'auto',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-                border: '1px solid var(--border-color)',
-                padding: '1.5rem',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
+            {(() => {
+                const popW = Math.min(800, window.innerWidth * 0.95);
+                const estimatedHeight = window.innerHeight * 0.85; 
+                const popLeft = Math.max(10, Math.min(editPopupPosition.left, window.innerWidth - popW - 10));
+                const popTop = Math.max(10, Math.min(editPopupPosition.top, window.innerHeight - estimatedHeight - 10));
+                
+                const originX = editPopupPosition.left - popLeft;
+                const originY = editPopupPosition.top - popTop;
+
+                return (
+                  <div 
+                    className="card genie-effect" 
+                    style={{ 
+                      position: 'absolute',
+                      left: popLeft,
+                      top: popTop,
+                      width: '800px', 
+                      maxWidth: '95vw',
+                      maxHeight: '85vh',
+                      overflowY: 'auto',
+                      boxShadow: '0 15px 35px rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-color)',
+                      padding: '1.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      transformOrigin: `${originX}px ${originY}px`
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>학생 정보 수정</h3>
               <button 
                 onClick={() => {
@@ -1894,6 +1908,8 @@ function App() {
                 </div>
               </form>
             </div>
+            );
+            })()}
           </div>
         )}
 
