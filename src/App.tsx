@@ -1668,13 +1668,17 @@ function App() {
         {editingStudentId && editPopupPosition && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999}} onClick={() => { setEditingStudentId(null); setEditPopupPosition(null); }}>
             {(() => {
-                const isBottomHalf = editPopupPosition.top > window.innerHeight / 2;
-                const isRightHalf = editPopupPosition.left > window.innerWidth / 2;
+                // 정확하게 클릭한 위치(editPopupPosition) 바로 옆에 뜨도록 계산
+                const popW = 550; // 약간 더 슬림하게 줄여서 우측 짤림 방지
                 
+                // 마우스 클릭 위치보다 살짝 우상단에 기준을 맞춤
+                const popLeft = Math.min(editPopupPosition.left + 20, window.innerWidth - popW - 10);
+                const popTop = Math.max(10, Math.min(editPopupPosition.top - 30, window.innerHeight - 600)); 
+
                 const cssStyles: React.CSSProperties = {
                   position: 'absolute',
-                  width: '600px', 
-                  maxWidth: '95vw',
+                  width: `${popW}px`, 
+                  maxWidth: '90vw',
                   maxHeight: '85vh',
                   overflowY: 'auto',
                   boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
@@ -1682,21 +1686,10 @@ function App() {
                   padding: '1.5rem',
                   display: 'flex',
                   flexDirection: 'column',
+                  left: `${popLeft}px`,
+                  top: `${popTop}px`,
+                  transformOrigin: `-20px 30px` // 팝업창 바깥의 원래 마우스 위치 방향으로 지정
                 };
-                
-                if (isBottomHalf) {
-                   cssStyles.bottom = window.innerHeight - editPopupPosition.top + 5;
-                   cssStyles.transformOrigin = isRightHalf ? '100% 100%' : '0% 100%';
-                } else {
-                   cssStyles.top = editPopupPosition.top;
-                   cssStyles.transformOrigin = isRightHalf ? '100% 0%' : '0% 0%';
-                }
-                
-                if (isRightHalf) {
-                   cssStyles.right = window.innerWidth - editPopupPosition.left + 5;
-                } else {
-                   cssStyles.left = editPopupPosition.left;
-                }
 
                 return (
                   <div 
