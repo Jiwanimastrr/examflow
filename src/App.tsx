@@ -122,6 +122,7 @@ function App() {
   const [printComment, setPrintComment] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const [isReportMode, setIsReportMode] = useState(false);
 
   // URL 쿼리 파라미터로 결과지 자동 열기
   useEffect(() => {
@@ -129,6 +130,7 @@ function App() {
     const reportId = params.get('report');
     if (reportId) {
       setPrintStudentId(reportId);
+      setIsReportMode(true);
       const speed = params.get('speed');
       const comment = params.get('comment');
       if (speed) setPrintSpeed(decodeURIComponent(speed));
@@ -844,6 +846,70 @@ function App() {
   // we can just reverse, but normally we just take the last 3 or sort ascending.
   const sortedByProgressAsc = [...studentsWithProgress].sort((a, b) => a.progressData.currentMaterialPct - b.progressData.currentMaterialPct);
   const bottom3Students = sortedByProgressAsc.slice(0, 3);
+
+  // 결과지 전용 모드: 링크로 접속했을 때 결과지만 보여줌
+  if (isReportMode && printStudentId) {
+    const rStudent = students.find(s => s.id === printStudentId);
+    if (students.length === 0) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-secondary)' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📄</div>
+            <div>결과지를 불러오는 중...</div>
+          </div>
+        </div>
+      );
+    }
+    if (!rStudent) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-secondary)' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>❌</div>
+            <div>해당 학생을 찾을 수 없습니다.</div>
+          </div>
+        </div>
+      );
+    }
+    const rProgress = calculateStudentProgress(rStudent).overallPct;
+    const rGradeAvg = getGradeAverageProgress(rStudent.grade);
+    return (
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 30px', backgroundColor: 'white', minHeight: '100vh', color: 'black', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid black', paddingBottom: '10px' }}>
+          <h1 style={{ fontSize: '28px', margin: 0 }}>내신대비 결과 보고서</h1>
+          <span style={{ fontSize: '18px', display: 'flex', alignItems: 'flex-end' }}>{rStudent.school} {rStudent.grade}</span>
+        </div>
+        
+        <div style={{ marginTop: '20px', fontSize: '20px' }}>
+          <strong>이름:</strong> <span style={{ fontSize: '24px'}}>{rStudent.name}</span> {rStudent.studentClass && `(${rStudent.studentClass})`}
+        </div>
+        
+        <div style={{ marginTop: '30px', display: 'flex', gap: '20px' }}>
+          <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>전체 과정 달성률</h3>
+            <div style={{ fontSize: '40px', fontWeight: 'bold', color: '#007AFF' }}>{rProgress}%</div>
+            <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+              (동학년 평균 대비: {rProgress >= rGradeAvg ? '+' : ''}{rProgress - rGradeAvg}%)
+            </div>
+          </div>
+          <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>학습 참여 속도 및 성실도</h3>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#34C759', marginTop: '10px' }}>{printSpeed}</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '30px', border: '1px solid #ddd', padding: '25px', minHeight: '300px', borderRadius: '12px' }}>
+          <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #eee', paddingBottom: '10px', fontSize: '20px' }}>Tutors' Comment</h3>
+          <div style={{ fontSize: '18px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+            {printComment || '이번 시험 대비를 위해 열심히 공부하고 있습니다!'}
+          </div>
+        </div>
+        
+        <div style={{ marginTop: '60px', textAlign: 'center', color: '#888', fontSize: '14px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+          윌그로우 내신대비 마스터 시스템
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
