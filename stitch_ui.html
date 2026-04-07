@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Obsidian Scholar - Exam Tracker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-tint": "#b8c3ff",
+              "tertiary-container": "#886827",
+              "on-error-container": "#ffdad6",
+              "error-container": "#93000a",
+              "primary": "#b8c3ff",
+              "inverse-on-surface": "#313030",
+              "on-surface-variant": "#c4c5d9",
+              "secondary": "#b8c3ff",
+              "surface-container-high": "#2a2a2a",
+              "surface-container-lowest": "#0e0e0e",
+              "on-tertiary": "#412d00",
+              "on-tertiary-fixed": "#261900",
+              "tertiary-fixed": "#ffdea5",
+              "surface": "#131313",
+              "on-primary-fixed-variant": "#0035be",
+              "error": "#ffb4ab",
+              "on-primary": "#002388",
+              "on-primary-fixed": "#001356",
+              "on-primary-container": "#efefff",
+              "on-secondary-fixed": "#001356",
+              "on-error": "#690005",
+              "on-secondary-container": "#a6b4ff",
+              "surface-variant": "#353534",
+              "primary-fixed-dim": "#b8c3ff",
+              "on-secondary-fixed-variant": "#304189",
+              "outline": "#8e90a2",
+              "secondary-container": "#33438c",
+              "surface-container-highest": "#353534",
+              "background": "#131313",
+              "primary-container": "#2e5bff",
+              "surface-dim": "#131313",
+              "tertiary": "#e9c176",
+              "outline-variant": "#434656",
+              "surface-bright": "#393939",
+              "secondary-fixed": "#dde1ff",
+              "on-tertiary-fixed-variant": "#5d4201",
+              "on-secondary": "#172972",
+              "inverse-surface": "#e5e2e1",
+              "surface-container": "#201f1f",
+              "on-tertiary-container": "#ffeed5",
+              "tertiary-fixed-dim": "#e9c176",
+              "primary-fixed": "#dde1ff",
+              "inverse-primary": "#124af0",
+              "on-surface": "#e5e2e1",
+              "surface-container-low": "#1c1b1b",
+              "secondary-fixed-dim": "#b8c3ff",
+              "on-background": "#e5e2e1"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(53, 53, 52, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .electric-pulse {
+            background: linear-gradient(135deg, #b8c3ff 0%, #2e5bff 100%);
+        }
+        .text-glow {
+            text-shadow: 0 0 15px rgba(184, 195, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen">
+<!-- SideNavBar -->
+<nav class="h-screen w-64 fixed left-0 top-0 border-r border-white/5 bg-stone-950/80 backdrop-blur-xl shadow-[20px_0_40px_rgba(0,0,0,0.4)] flex flex-col h-full py-8 z-50 font-['Manrope'] antialiased tracking-tight">
+<div class="px-8 mb-12">
+<div class="text-xl font-bold tracking-tighter text-blue-400">Obsidian Scholar</div>
+<div class="text-[10px] uppercase tracking-[0.2em] text-stone-500 mt-1">Academic Excellence</div>
+</div>
+<div class="flex-1 space-y-2 px-4">
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 hover:text-stone-200 transition-colors hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-blue-400 font-semibold border-r-2 border-blue-500 bg-blue-500/10 hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-sm font-medium">Exams</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 hover:text-stone-200 transition-colors hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-sm font-medium">Students</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 hover:text-stone-200 transition-colors hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined">insights</span>
+<span class="text-sm font-medium">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 hover:text-stone-200 transition-colors hover:bg-white/5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</a>
+</div>
+<div class="px-6 mb-8">
+<button class="w-full electric-pulse text-on-primary py-3 rounded-DEFAULT font-bold text-sm shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
+                New Exam
+            </button>
+</div>
+<div class="border-t border-white/5 pt-6 px-4 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 hover:text-stone-200 transition-colors hover:bg-white/5 transition-all duration-300 rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-sm font-medium">Support</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 hover:text-stone-200 transition-colors hover:bg-white/5 transition-all duration-300 rounded-lg" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-sm font-medium">Logout</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-20 z-40 bg-stone-900/60 backdrop-blur-2xl shadow-2xl shadow-blue-900/5 flex justify-between items-center px-10 font-['Manrope'] font-medium text-sm">
+<div class="flex items-center gap-8">
+<h1 class="text-lg font-black text-white tracking-widest uppercase">Exam Tracker Dashboard</h1>
+<nav class="hidden lg:flex items-center gap-6">
+<a class="text-stone-400 hover:text-white transition-colors hover:bg-white/5 rounded-full px-3 py-1 transition-all" href="#">Overview</a>
+<a class="text-blue-400 font-bold border-b-2 border-blue-400 pb-1 hover:bg-white/5 rounded-full px-3 py-1 transition-all" href="#">Reports</a>
+<a class="text-stone-400 hover:text-white transition-colors hover:bg-white/5 rounded-full px-3 py-1 transition-all" href="#">Schedules</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">search</span>
+<input class="bg-surface-container-lowest border-none rounded-full py-2 pl-10 pr-4 text-xs w-48 focus:ring-1 focus:ring-primary focus:w-64 transition-all" placeholder="Quick search..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-stone-400 hover:text-white cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-stone-400 hover:text-white cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<div class="h-8 w-[1px] bg-white/10 mx-2"></div>
+<button class="flex items-center gap-3 pl-2 pr-1 py-1 rounded-full bg-white/5 hover:bg-white/10 transition-all">
+<span class="text-xs font-semibold text-white">Dr. Aris Thorne</span>
+<img alt="Academic Administrator Profile" class="h-8 w-8 rounded-full object-cover border border-primary/20" data-alt="Close-up professional portrait of a distinguished academic administrator with salt-and-pepper hair in a dark grey suit, studio lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuABwZNZ_TGaKAOBRVng3MfRB_b95vwpPTzSEiGt-LcYFKAsearrxWlVYJNp0eK7pirXvBYx9qNbukMDJRdpeGwXogrLAdsRQ8UTF1M9j5mZHIcS7eWmrXmHchzB7oD-kxjxEdkz2a6R7ViWj850ZhxhqmNhVgAwiUK7enNaQuMMhH0CTz_uLcstHyGA1ARce7t6hS3y4M1m0S9_UWUkfctbFOdoTp8kn4AUJfLcSXJahPGurM_xX0XZed9Sa634VLlYPpdvtTLwYkg"/>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-64 pt-28 px-10 pb-20">
+<!-- Welcome & Metrics Header -->
+<div class="flex flex-col lg:flex-row justify-between items-end gap-8 mb-12">
+<div class="max-w-2xl">
+<h2 class="text-5xl font-headline font-extrabold tracking-tight mb-4 text-glow">Midterm Evaluations</h2>
+<p class="text-on-surface-variant font-light text-lg">Batch 2024 • Humanities Department • Section A-12</p>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface-container-high p-6 rounded-DEFAULT border border-white/5 min-w-[160px]">
+<div class="text-tertiary text-xs uppercase tracking-widest font-bold mb-2">Average Score</div>
+<div class="text-3xl font-headline font-bold">88.4%</div>
+</div>
+<div class="bg-surface-container-high p-6 rounded-DEFAULT border border-white/5 min-w-[160px]">
+<div class="text-primary text-xs uppercase tracking-widest font-bold mb-2">Completion</div>
+<div class="text-3xl font-headline font-bold text-glow">92%</div>
+</div>
+</div>
+</div>
+<!-- Filter Bar -->
+<section class="glass-panel p-6 rounded-lg mb-10 flex flex-wrap items-center gap-6 border border-white/5">
+<div class="flex-1 min-w-[300px]">
+<label class="block text-[10px] uppercase tracking-widest text-stone-500 mb-2 font-bold px-1">Search Student</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary">person_search</span>
+<input class="w-full bg-surface-container-lowest border-none rounded-DEFAULT py-3 pl-12 pr-4 text-sm focus:ring-1 focus:ring-primary transition-all" placeholder="Enter student name or ID..." type="text"/>
+</div>
+</div>
+<div class="w-48">
+<label class="block text-[10px] uppercase tracking-widest text-stone-500 mb-2 font-bold px-1">School</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest border-none rounded-DEFAULT py-3 px-4 text-sm appearance-none focus:ring-1 focus:ring-primary">
+<option>Main Campus</option>
+<option>West Wing</option>
+<option>North Academy</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="w-32">
+<label class="block text-[10px] uppercase tracking-widest text-stone-500 mb-2 font-bold px-1">Grade</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest border-none rounded-DEFAULT py-3 px-4 text-sm appearance-none focus:ring-1 focus:ring-primary">
+<option>12th</option>
+<option>11th</option>
+<option>10th</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="w-32">
+<label class="block text-[10px] uppercase tracking-widest text-stone-500 mb-2 font-bold px-1">Class</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest border-none rounded-DEFAULT py-3 px-4 text-sm appearance-none focus:ring-1 focus:ring-primary">
+<option>A-12</option>
+<option>B-12</option>
+<option>C-12</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="self-end pb-1">
+<button class="bg-surface-container-highest p-3 rounded-DEFAULT hover:bg-surface-bright transition-colors text-primary active:scale-95">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</section>
+<!-- Student Data Table -->
+<section class="glass-panel rounded-lg overflow-hidden border border-white/5 shadow-2xl">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-white/5">
+<th class="px-8 py-5 text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400">Student Identity</th>
+<th class="px-8 py-5 text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400">Overall Progress</th>
+<th class="px-4 py-5 text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400 text-center">Vocabulary</th>
+<th class="px-4 py-5 text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400 text-center">Reading</th>
+<th class="px-4 py-5 text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400 text-center">Grammar</th>
+<th class="px-8 py-5 text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<!-- Row 1 -->
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="h-10 w-10 rounded-full bg-primary-container/20 flex items-center justify-center text-primary font-bold">EH</div>
+<div>
+<div class="text-sm font-semibold text-white">Elias Halloway</div>
+<div class="text-xs text-stone-500">ID: #88291-A</div>
+</div>
+</div>
+</td>
+<td class="px-8 py-6">
+<div class="w-full max-w-[200px]">
+<div class="flex justify-between items-center mb-2">
+<span class="text-[10px] font-bold text-primary">EXCELLENT</span>
+<span class="text-[10px] font-bold text-white">94%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full electric-pulse w-[94%] shadow-[0_0_10px_rgba(46,91,255,0.4)]"></div>
+</div>
+</div>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-primary-container/20 text-primary border border-primary/20 flex items-center justify-center mx-auto hover:bg-primary-container/40 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-primary-container/20 text-primary border border-primary/20 flex items-center justify-center mx-auto hover:bg-primary-container/40 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-tertiary-container/10 text-tertiary/40 border border-tertiary/10 flex items-center justify-center mx-auto hover:bg-tertiary-container/20 transition-all">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+</button>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="text-tertiary text-xs font-bold uppercase tracking-widest hover:text-white transition-colors">Finalize Grade</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="h-10 w-10 rounded-full bg-tertiary-container/20 flex items-center justify-center text-tertiary font-bold">SK</div>
+<div>
+<div class="text-sm font-semibold text-white">Selina Kyle</div>
+<div class="text-xs text-stone-500">ID: #88302-A</div>
+</div>
+</div>
+</td>
+<td class="px-8 py-6">
+<div class="w-full max-w-[200px]">
+<div class="flex justify-between items-center mb-2">
+<span class="text-[10px] font-bold text-tertiary">STEADY</span>
+<span class="text-[10px] font-bold text-white">72%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[72%] shadow-[0_0_10px_rgba(233,193,118,0.2)]"></div>
+</div>
+</div>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-primary-container/20 text-primary border border-primary/20 flex items-center justify-center mx-auto hover:bg-primary-container/40 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-tertiary-container/10 text-tertiary/40 border border-tertiary/10 flex items-center justify-center mx-auto hover:bg-tertiary-container/20 transition-all">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+</button>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-tertiary-container/10 text-tertiary/40 border border-tertiary/10 flex items-center justify-center mx-auto hover:bg-tertiary-container/20 transition-all">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+</button>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="text-tertiary text-xs font-bold uppercase tracking-widest hover:text-white transition-colors">Finalize Grade</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="h-10 w-10 rounded-full bg-primary-container/20 flex items-center justify-center text-primary font-bold">JV</div>
+<div>
+<div class="text-sm font-semibold text-white">Julian Vance</div>
+<div class="text-xs text-stone-500">ID: #88410-A</div>
+</div>
+</div>
+</td>
+<td class="px-8 py-6">
+<div class="w-full max-w-[200px]">
+<div class="flex justify-between items-center mb-2">
+<span class="text-[10px] font-bold text-primary">ADVANCING</span>
+<span class="text-[10px] font-bold text-white">45%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full electric-pulse w-[45%]"></div>
+</div>
+</div>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-primary-container/20 text-primary border border-primary/20 flex items-center justify-center mx-auto hover:bg-primary-container/40 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</button>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-tertiary-container/10 text-tertiary/40 border border-tertiary/10 flex items-center justify-center mx-auto hover:bg-tertiary-container/20 transition-all">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+</button>
+</td>
+<td class="px-4 py-6 text-center">
+<button class="h-8 w-8 rounded-lg bg-tertiary-container/10 text-tertiary/40 border border-tertiary/10 flex items-center justify-center mx-auto hover:bg-tertiary-container/20 transition-all">
+<span class="material-symbols-outlined text-sm">radio_button_unchecked</span>
+</button>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="text-tertiary text-xs font-bold uppercase tracking-widest hover:text-white transition-colors">Finalize Grade</button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Table Footer -->
+<div class="bg-white/5 px-8 py-4 flex justify-between items-center">
+<div class="text-xs text-stone-500 font-medium">Showing 3 of 42 students in Section A-12</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg bg-surface-container-highest text-stone-400 hover:text-white transition-colors disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-2 rounded-lg bg-surface-container-highest text-stone-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Asymmetric Performance Insight Card -->
+<div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="md:col-span-2 glass-panel p-8 rounded-lg border border-white/5 relative overflow-hidden">
+<div class="relative z-10">
+<h3 class="text-2xl font-headline font-bold mb-2">Class Distribution</h3>
+<p class="text-on-surface-variant text-sm mb-8">Performance breakdown by percentile across the humanities department.</p>
+<div class="flex items-end gap-3 h-48">
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[20%] group relative">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-stone-500 opacity-0 group-hover:opacity-100 transition-opacity">0-20%</div>
+</div>
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[35%] group relative"></div>
+<div class="flex-1 bg-tertiary/30 rounded-t-lg h-[65%] group relative"></div>
+<div class="flex-1 electric-pulse rounded-t-lg h-[85%] group relative shadow-[0_0_30px_rgba(46,91,255,0.2)]">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-primary opacity-100 transition-opacity">80-100%</div>
+</div>
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[15%] group relative"></div>
+</div>
+</div>
+<!-- Abstract visual element -->
+<div class="absolute -right-20 -bottom-20 w-64 h-64 bg-primary/5 rounded-full blur-[100px]"></div>
+</div>
+<div class="glass-panel p-8 rounded-lg border border-white/5 flex flex-col justify-between">
+<div>
+<h3 class="text-xl font-headline font-bold mb-6">Subject Proficiency</h3>
+<div class="space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold uppercase tracking-widest text-stone-400">
+<span>Vocabulary</span>
+<span class="text-white">92%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[92%]"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold uppercase tracking-widest text-stone-400">
+<span>Reading Comp.</span>
+<span class="text-white">78%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[78%]"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold uppercase tracking-widest text-stone-400">
+<span>Grammar Tech.</span>
+<span class="text-white">84%</span>
+</div>
+<div class="h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[84%]"></div>
+</div>
+</div>
+</div>
+</div>
+<button class="mt-8 text-primary text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 hover:translate-x-2 transition-transform">
+                    View Full Insight <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Floating Action Button Contextual Suppression: Not suppressed for Dashboard/Home -->
+<button class="fixed bottom-10 right-10 electric-pulse w-14 h-14 rounded-full flex items-center justify-center text-on-primary shadow-2xl shadow-primary-container/40 z-50 hover:scale-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+</button>
+</body></html>

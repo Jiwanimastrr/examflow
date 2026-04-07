@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Student, LoginRecord, SchoolExamDate, StudentComment } from './types';
@@ -119,6 +120,21 @@ function App() {
   const [printStudentId, setPrintStudentId] = useState<string | null>(null);
   const [printSpeed, setPrintSpeed] = useState<string>('보통');
   const [printComment, setPrintComment] = useState<string>('');
+  const [linkCopied, setLinkCopied] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // URL 쿼리 파라미터로 결과지 자동 열기
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reportId = params.get('report');
+    if (reportId) {
+      setPrintStudentId(reportId);
+      const speed = params.get('speed');
+      const comment = params.get('comment');
+      if (speed) setPrintSpeed(decodeURIComponent(speed));
+      if (comment) setPrintComment(decodeURIComponent(comment));
+    }
+  }, []);
 
   // Firestore realtime listeners
   useEffect(() => {
@@ -1946,9 +1962,32 @@ function App() {
                     />
                  </div>
                  
-                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                    <button className="btn" onClick={() => setPrintStudentId(null)}>취소</button>
-                    <button className="btn btn-primary" onClick={() => window.print()}>명세서 인쇄</button>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                       <button className="btn" style={{ fontSize: '0.85rem' }} onClick={() => {
+                         const el = printRef.current;
+                         if (!el) return;
+                         el.style.display = 'block';
+                         html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
+                           el.style.display = 'none';
+                           const link = document.createElement('a');
+                           link.download = `결과보고서_${students.find(s => s.id === printStudentId)?.name || 'student'}.png`;
+                           link.href = canvas.toDataURL('image/png');
+                           link.click();
+                         }).catch(() => { el.style.display = 'none'; });
+                       }}>📷 PNG 다운로드</button>
+                       <button className="btn" style={{ fontSize: '0.85rem' }} onClick={() => {
+                         const url = `${window.location.origin}${window.location.pathname}?report=${printStudentId}&speed=${encodeURIComponent(printSpeed)}&comment=${encodeURIComponent(printComment)}`;
+                         navigator.clipboard.writeText(url).then(() => {
+                           setLinkCopied(true);
+                           setTimeout(() => setLinkCopied(false), 2000);
+                         });
+                       }}>{linkCopied ? '✅ 복사됨!' : '🔗 링크 복사'}</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                       <button className="btn" onClick={() => setPrintStudentId(null)}>취소</button>
+                       <button className="btn btn-primary" onClick={() => window.print()}>🖨️ 인쇄</button>
+                    </div>
                  </div>
               </div>
            </div>
@@ -1956,7 +1995,7 @@ function App() {
       })()}
 
       {/* Actual Print Content Component (Only visible when printing) */}
-      <div id="print-section" style={{ display: 'none' }}>
+      <div id="print-section" ref={printRef} style={{ display: 'none' }}>
         {printStudentId && (() => {
            const pStudent = students.find(s => s.id === printStudentId);
            if (!pStudent) return null;
