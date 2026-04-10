@@ -99,6 +99,18 @@ function App() {
   const [bulkAssignClassFilter, setBulkAssignClassFilter] = useState('전체');
   const [bulkAssignNewCustomTask, setBulkAssignNewCustomTask] = useState('');
   const [bulkAssignCustomTasksList, setBulkAssignCustomTasksList] = useState<{id: string, label: string}[]>([]);
+  
+  // FullScreen Table State
+  const [isTableFullScreen, setIsTableFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (isTableFullScreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isTableFullScreen]);
 
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentSchool, setNewStudentSchool] = useState(SCHOOLS[1]); // default to first real school
@@ -116,13 +128,52 @@ function App() {
   const [selectedStudentIdForComments, setSelectedStudentIdForComments] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
 
-  // Print Report States
+  // Print & Report States
+  const defaultReportData = {
+    subject: '영어',
+    books: { baekbal: 0, naesin: 0, exam4you: 0, jokbo: 0 },
+    achieve: { vocab: 5, grammar: 5, analysis: 5, writing: 5, sincerity: 5 },
+    comment: ''
+  };
   const [printStudentId, setPrintStudentId] = useState<string | null>(null);
-  const [printSpeed, setPrintSpeed] = useState<string>('보통');
-  const [printComment, setPrintComment] = useState<string>('');
+  const [reportData, setReportData] = useState(defaultReportData);
   const [linkCopied, setLinkCopied] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const [isReportMode, setIsReportMode] = useState(false);
+
+  // 데이터 기반 문제 풀이 속도 자동 연산 로직 (1~10 척도)
+  const getSolvingSpeedScore = (studentId: string) => {
+    // 1. 전체 학생들의 시간 데이터를 계산 (최대시간 - 최소시간) / 개수
+    const getSpeedMetric = (student: Student) => {
+      const progresses = Object.values(student.progress).filter(p => p.isChecked && p.updatedAt).map(p => p.updatedAt as number);
+      if (progresses.length < 2) return null; // 계산 불가
+      const min = Math.min(...progresses);
+      const max = Math.max(...progresses);
+      if (max === min) return null;
+      return (max - min) / progresses.length; // 아이템 하나당 평균 소요 시간 (작을수록 매우 빠름)
+    };
+
+    const targetStudent = students.find(s => s.id === studentId);
+    if (!targetStudent) return 5;
+    
+    // 동년배(같은 학년) 학생들의 속도 수집
+    const peerMetrics: number[] = [];
+    students.filter(s => s.grade === targetStudent.grade).forEach(peer => {
+      const metric = getSpeedMetric(peer);
+      if (metric !== null) peerMetrics.push(metric);
+    });
+
+    const targetMetric = getSpeedMetric(targetStudent);
+    if (targetMetric === null || peerMetrics.length === 0) return 5; // 기본값 반환
+
+    // 속도(시간)가 짧을수록 빠른 것이므로 오름차순 정렬 (index 0 = 가장 빠른속도)
+    const sorted = [...peerMetrics].sort((a,b) => a - b); 
+    const position = sorted.indexOf(targetMetric);
+    
+    // 가장 빠른(시간이 적은, position==0) 사람이 percentile 1, 가장 느린 사람이 0
+    const percentile = (sorted.length - 1 - position) / (Math.max(1, sorted.length - 1));
+    return Math.round(percentile * 9) + 1; // 1~10 반환
+  };
 
   // URL 쿼리 파라미터로 결과지 자동 열기
   useEffect(() => {
@@ -131,10 +182,15 @@ function App() {
     if (reportId) {
       setPrintStudentId(reportId);
       setIsReportMode(true);
-      const speed = params.get('speed');
-      const comment = params.get('comment');
-      if (speed) setPrintSpeed(decodeURIComponent(speed));
-      if (comment) setPrintComment(decodeURIComponent(comment));
+      const dataStr = params.get('data');
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(atob(dataStr)));
+          setReportData(parsed);
+        } catch(e) {
+          console.error("Failed to parse report data", e);
+        }
+      }
     }
   }, []);
 
@@ -847,68 +903,100 @@ function App() {
   const sortedByProgressAsc = [...studentsWithProgress].sort((a, b) => a.progressData.currentMaterialPct - b.progressData.currentMaterialPct);
   const bottom3Students = sortedByProgressAsc.slice(0, 3);
 
+  // --- 결과지 전용 레이아웃 헬퍼 함수 ---
+  const renderPrintableReport = (student: Student, reportState: typeof reportData, speedScore: number, progressPct: number, gradeAvg: number) => {
+    // ProgressBar 헬퍼 컴포넌트
+    const ProgressBar = ({ label, value }: { label: string, value: number }) => (
+      <div style={{ marginBottom: '1.2rem' }}>
+         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '14px', fontWeight: 'bold', color: '#4B5563' }}>
+            <span>{label}</span>
+            <span style={{ color: '#2563EB' }}>{value} <span style={{ color: '#9CA3AF'}}>/ 10</span></span>
+         </div>
+         <div style={{ width: '100%', height: '12px', backgroundColor: '#E5E7EB', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${value * 10}%`, backgroundColor: '#3B82F6', borderRadius: '10px' }} />
+         </div>
+      </div>
+    );
+
+    return (
+      <div style={{ maxWidth: '850px', margin: '0 auto', padding: '50px 40px', backgroundColor: 'white', color: 'black', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #1F2937', paddingBottom: '20px' }}>
+             <div>
+                <h1 style={{ fontSize: '36px', margin: 0, color: '#111827', letterSpacing: '-0.5px', fontWeight: '900' }}>REPORT CARD</h1>
+                <div style={{ fontSize: '16px', color: '#6B7280', marginTop: '8px', fontWeight: '500' }}>{reportState.subject} 과목 내신 대비 결과 보고서</div>
+             </div>
+             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#1F2937' }}>{student.school} {student.grade}</span>
+                <span style={{ fontSize: '18px', color: '#4B5563', marginTop: '4px' }}>{student.name} {student.studentClass && `(${student.studentClass})`}</span>
+             </div>
+          </div>
+          
+          <div style={{ marginTop: '35px', display: 'flex', gap: '25px' }}>
+             <div style={{ flex: 1, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '30px', borderRadius: '16px' }}>
+                <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#64748B', fontWeight: '600' }}>종합 달성률</h3>
+                <div style={{ fontSize: '48px', fontWeight: '900', color: '#2563EB', letterSpacing: '-1px' }}>{progressPct}%</div>
+                <div style={{ marginTop: '10px', fontSize: '14px', color: '#64748B', fontWeight: '500' }}>
+                  동학년 평균({gradeAvg}%) 대비 <span style={{ color: progressPct >= gradeAvg ? '#059669' : '#DC2626', fontWeight: 'bold'}}>{progressPct >= gradeAvg ? '+' : ''}{progressPct - gradeAvg}%</span>
+                </div>
+             </div>
+             <div style={{ flex: 1, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '30px', borderRadius: '16px' }}>
+                <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#64748B', fontWeight: '600' }}>문제 풀이 속도</h3>
+                <div style={{ fontSize: '48px', fontWeight: '900', color: speedScore >= 7 ? '#059669' : (speedScore >= 4 ? '#D97706' : '#DC2626'), letterSpacing: '-1px' }}>{speedScore} <span style={{fontSize: '22px', color: '#94A3B8', fontWeight: '600'}}>/ 10</span></div>
+                <div style={{ marginTop: '10px', fontSize: '14px', color: '#64748B', fontWeight: '500' }}>시스템 자동 산출 지표의 10점 만점 척도</div>
+             </div>
+          </div>
+
+          <div style={{ marginTop: '35px', display: 'flex', gap: '35px' }}>
+             <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '18px', borderBottom: '2px solid #E2E8F0', paddingBottom: '12px', marginBottom: '25px', color: '#0F172A', fontWeight: 'bold' }}>📚 교재별 학습 달성 분석</h3>
+                <ProgressBar label="백발백중" value={reportState.books.baekbal} />
+                <ProgressBar label="내신콘서트" value={reportState.books.naesin} />
+                <ProgressBar label="exam4you" value={reportState.books.exam4you} />
+                <ProgressBar label="족보" value={reportState.books.jokbo} />
+             </div>
+             <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '18px', borderBottom: '2px solid #E2E8F0', paddingBottom: '12px', marginBottom: '25px', color: '#0F172A', fontWeight: 'bold' }}>🎓 세부 영역 및 태도 평가</h3>
+                <ProgressBar label="어휘" value={reportState.achieve.vocab} />
+                <ProgressBar label="핵심 문법" value={reportState.achieve.grammar} />
+                <ProgressBar label="본문 분석 및 암기" value={reportState.achieve.analysis} />
+                <ProgressBar label="서술형 영작" value={reportState.achieve.writing} />
+                <ProgressBar label="내신기간 성실도" value={reportState.achieve.sincerity} />
+             </div>
+          </div>
+
+          <div style={{ marginTop: '45px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '35px', borderRadius: '16px', minHeight: '200px' }}>
+             <h3 style={{ margin: '0 0 20px 0', fontSize: '20px', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 'bold' }}>
+                <span style={{ fontSize: '24px' }}>💬</span> 담당 강사 종합 피드백
+             </h3>
+             <div style={{ fontSize: '17px', lineHeight: '1.8', whiteSpace: 'pre-wrap', color: '#334155' }}>
+                {reportState.comment || '이번 시험 대비를 위해 성실하게 노력했습니다. 이대로 학습 페이스를 조금 더 올려서 진행하면 다음 과정에서 더 좋은 효과를 기대할 수 있습니다.'}
+             </div>
+          </div>
+          
+          <div style={{ marginTop: '60px', textAlign: 'center', color: '#94A3B8', fontSize: '15px', borderTop: '1px solid #E2E8F0', paddingTop: '25px', fontWeight: '700', letterSpacing: '2px' }}>
+             WILLGROW EDUCATION SYSTEM
+          </div>
+      </div>
+    );
+  };
+
   // 결과지 전용 모드: 링크로 접속했을 때 결과지만 보여줌
   if (isReportMode && printStudentId) {
     const rStudent = students.find(s => s.id === printStudentId);
-    if (students.length === 0) {
+    if (!rStudent || students.length === 0) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-secondary)' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📄</div>
-            <div>결과지를 불러오는 중...</div>
-          </div>
-        </div>
-      );
-    }
-    if (!rStudent) {
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-secondary)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>❌</div>
-            <div>해당 학생을 찾을 수 없습니다.</div>
+            <div>결과지를 불러오는 중이거나 찾을 수 없습니다.</div>
           </div>
         </div>
       );
     }
     const rProgress = calculateStudentProgress(rStudent).overallPct;
     const rGradeAvg = getGradeAverageProgress(rStudent.grade);
-    return (
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 30px', backgroundColor: 'white', minHeight: '100vh', color: 'black', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid black', paddingBottom: '10px' }}>
-          <h1 style={{ fontSize: '28px', margin: 0 }}>내신대비 결과 보고서</h1>
-          <span style={{ fontSize: '18px', display: 'flex', alignItems: 'flex-end' }}>{rStudent.school} {rStudent.grade}</span>
-        </div>
-        
-        <div style={{ marginTop: '20px', fontSize: '20px' }}>
-          <strong>이름:</strong> <span style={{ fontSize: '24px'}}>{rStudent.name}</span> {rStudent.studentClass && `(${rStudent.studentClass})`}
-        </div>
-        
-        <div style={{ marginTop: '30px', display: 'flex', gap: '20px' }}>
-          <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>전체 과정 달성률</h3>
-            <div style={{ fontSize: '40px', fontWeight: 'bold', color: '#007AFF' }}>{rProgress}%</div>
-            <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-              (동학년 평균 대비: {rProgress >= rGradeAvg ? '+' : ''}{rProgress - rGradeAvg}%)
-            </div>
-          </div>
-          <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>학습 참여 속도 및 성실도</h3>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#34C759', marginTop: '10px' }}>{printSpeed}</div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '30px', border: '1px solid #ddd', padding: '25px', minHeight: '300px', borderRadius: '12px' }}>
-          <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #eee', paddingBottom: '10px', fontSize: '20px' }}>Tutors' Comment</h3>
-          <div style={{ fontSize: '18px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
-            {printComment || '이번 시험 대비를 위해 열심히 공부하고 있습니다!'}
-          </div>
-        </div>
-        
-        <div style={{ marginTop: '60px', textAlign: 'center', color: '#888', fontSize: '14px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-          윌그로우 내신대비 마스터 시스템
-        </div>
-      </div>
-    );
+    const rSpeedScore = getSolvingSpeedScore(rStudent.id);
+    return renderPrintableReport(rStudent, reportData, rSpeedScore, rProgress, rGradeAvg);
   }
 
   return (
@@ -1013,42 +1101,54 @@ function App() {
           </button>
         </form>
 
-        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            className="input search-input"
-            style={{ flex: 1, minWidth: '150px' }}
-            placeholder="학생 검색..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <select 
-            className="select" 
-            value={filterSchool} 
-            onChange={(e) => setFilterSchool(e.target.value)}
-          >
-            {SCHOOLS.map(school => (
-               <option key={school} value={school}>{school}</option>
-            ))}
-          </select>
-          <select 
-            className="select" 
-            value={filterGrade} 
-            onChange={(e) => setFilterGrade(e.target.value)}
-          >
-            {GRADES.map(grade => (
-               <option key={grade} value={grade}>{grade}</option>
-            ))}
-          </select>
-          <select 
-            className="select" 
-            value={filterClass} 
-            onChange={(e) => setFilterClass(e.target.value)}
-          >
-            {availableClasses.map(c => (
-               <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1, minWidth: '150px' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, paddingLeft: '0.3rem' }}>이름 검색</label>
+            <input
+              type="text"
+              className="input search-input"
+              style={{ width: '100%' }}
+              placeholder="학생 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, paddingLeft: '0.3rem' }}>학교 필터</label>
+            <select 
+              className="select" 
+              value={filterSchool} 
+              onChange={(e) => setFilterSchool(e.target.value)}
+            >
+              {SCHOOLS.map(school => (
+                 <option key={school} value={school}>학교: {school}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, paddingLeft: '0.3rem' }}>학년 필터</label>
+            <select 
+              className="select" 
+              value={filterGrade} 
+              onChange={(e) => setFilterGrade(e.target.value)}
+            >
+              {GRADES.map(grade => (
+                 <option key={grade} value={grade}>학년: {grade}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, paddingLeft: '0.3rem' }}>반 필터</label>
+            <select 
+              className="select" 
+              value={filterClass} 
+              onChange={(e) => setFilterClass(e.target.value)}
+            >
+              {availableClasses.map(c => (
+                 <option key={c} value={c}>반: {c}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="material-tabs" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
@@ -1127,7 +1227,32 @@ function App() {
           </div>
         )}
 
-        <div className="tracker-container">
+        {filteredStudents.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+            <button 
+              onClick={() => setIsTableFullScreen(true)}
+              className="btn"
+              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+              표 전체화면으로 보기
+            </button>
+          </div>
+        )}
+
+        <div className={`tracker-container ${isTableFullScreen ? 'fullscreen' : ''}`}>
+          {isTableFullScreen && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 100 }}>
+              <h2 className="title" style={{ fontSize: '1.2rem', margin: 0 }}>학생 과제 진행 상황 (전체화면)</h2>
+              <button 
+                onClick={() => setIsTableFullScreen(false)}
+                className="btn btn-danger"
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                닫기
+              </button>
+            </div>
+          )}
           <table className="tracker-table">
             <thead>
               <tr>
@@ -1188,8 +1313,7 @@ function App() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setPrintStudentId(student.id);
-                                setPrintSpeed('보통');
-                                setPrintComment('');
+                                setReportData(defaultReportData);
                               }}
                               title="결과지 인쇄/옵션보기"
                             >🖨️</span>
@@ -1565,21 +1689,21 @@ function App() {
                     value={bulkAssignSchoolFilter} 
                     onChange={e => setBulkAssignSchoolFilter(e.target.value)}
                   >
-                    {SCHOOLS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {SCHOOLS.map(s => <option key={s} value={s}>학교: {s}</option>)}
                   </select>
                   <select 
                     className="select" style={{ flex: 1, padding: '0.3rem' }}
                     value={bulkAssignGradeFilter} 
                     onChange={e => setBulkAssignGradeFilter(e.target.value)}
                   >
-                    {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                    {GRADES.map(g => <option key={g} value={g}>학년: {g}</option>)}
                   </select>
                   <select 
                     className="select" style={{ flex: 1, padding: '0.3rem' }}
                     value={bulkAssignClassFilter} 
                     onChange={e => setBulkAssignClassFilter(e.target.value)}
                   >
-                    {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                    {availableClasses.map(c => <option key={c} value={c}>반: {c}</option>)}
                   </select>
                 </div>
                 
@@ -1988,73 +2112,105 @@ function App() {
       </div>
       
       {/* Print Overlay Modal (No Print) */}
-      {printStudentId && (() => {
+      {printStudentId && !isReportMode && (() => {
          const pStudent = students.find(s => s.id === printStudentId);
          if (!pStudent) return null;
-         const myProgress = calculateStudentProgress(pStudent).overallPct;
-         const gradeAvg = getGradeAverageProgress(pStudent.grade);
+         
+         const speedScore = getSolvingSpeedScore(pStudent.id);
+         
+         const renderRangeInput = (label: string, value: number, onChange: (v: number) => void) => (
+           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem' }}>
+              <span style={{ width: '130px', fontWeight: '500', color: '#4B5563', fontSize: '0.95rem' }}>{label}</span>
+              <input type="range" min="0" max="10" step="1" value={value} onChange={e => onChange(Number(e.target.value))} style={{ flex: 1, accentColor: '#2563EB' }} />
+              <input type="number" min="0" max="10" value={value} onChange={e => onChange(Number(e.target.value))} style={{ width: '60px', padding: '0.4rem', borderRadius: '6px', border: '1px solid #D1D5DB', textAlign: 'center' }} />
+           </div>
+         );
          
          return (
-           <div className="no-print" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999}} onClick={() => setPrintStudentId(null)}>
-              <div className="card fade-in" style={{ width: '500px', maxWidth: '95vw', padding: '2rem' }} onClick={e => e.stopPropagation()}>
-                 <h2 className="title" style={{ fontSize: '1.4rem', marginBottom: '1rem' }}>결과지 인쇄</h2>
-                 <div style={{ marginBottom: '1rem' }}>
-                    <strong>{pStudent.name}</strong> ({pStudent.school} {pStudent.grade} {pStudent.studentClass})
-                 </div>
-                 <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', backgroundColor: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px' }}>
-                    <span>종합 달성률: <strong style={{ color: 'var(--accent-blue)', fontSize: '1.2rem' }}>{myProgress}%</strong></span>
-                    <span style={{ color: 'var(--text-secondary)' }}>동학년 평균: {gradeAvg}%</span>
-                 </div>
-                 
-                 <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>푸는 속도 (성실도)</label>
-                    <select className="select" style={{ width: '100%', padding: '0.7rem' }} value={printSpeed} onChange={e => setPrintSpeed(e.target.value)}>
-                       <option value="매우 빠름">매우 빠름</option>
-                       <option value="빠름">빠름</option>
-                       <option value="보통">보통</option>
-                       <option value="느린 편">느린 편</option>
-                       <option value="도움 필요">도움 필요</option>
-                    </select>
-                 </div>
-                 
-                 <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>선생님 코멘트 (선택)</label>
-                    <textarea 
-                      className="input" 
-                      style={{ height: '120px', resize: 'vertical' }}
-                      value={printComment}
-                      onChange={e => setPrintComment(e.target.value)}
-                      placeholder="학부모, 학생에게 전달할 코멘트를 작성해주세요."
-                    />
-                 </div>
-                 
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                       <button className="btn" style={{ fontSize: '0.85rem' }} onClick={() => {
-                         const el = printRef.current;
-                         if (!el) return;
-                         el.style.display = 'block';
-                         html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
-                           el.style.display = 'none';
-                           const link = document.createElement('a');
-                           link.download = `결과보고서_${students.find(s => s.id === printStudentId)?.name || 'student'}.png`;
-                           link.href = canvas.toDataURL('image/png');
-                           link.click();
-                         }).catch(() => { el.style.display = 'none'; });
-                       }}>📷 PNG 다운로드</button>
-                       <button className="btn" style={{ fontSize: '0.85rem' }} onClick={() => {
-                         const url = `${window.location.origin}${window.location.pathname}?report=${printStudentId}&speed=${encodeURIComponent(printSpeed)}&comment=${encodeURIComponent(printComment)}`;
-                         navigator.clipboard.writeText(url).then(() => {
-                           setLinkCopied(true);
-                           setTimeout(() => setLinkCopied(false), 2000);
-                         });
-                       }}>{linkCopied ? '✅ 복사됨!' : '🔗 링크 복사'}</button>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                       <button className="btn" onClick={() => setPrintStudentId(null)}>취소</button>
-                       <button className="btn btn-primary" onClick={() => window.print()}>🖨️ 인쇄</button>
-                    </div>
-                 </div>
+           <div className="no-print" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', overflowY: 'auto', display: 'flex', justifyContent: 'center', padding: '3rem 1rem', zIndex: 9999}} onClick={() => setPrintStudentId(null)}>
+              <div className="card fade-in" style={{ width: '900px', backgroundColor: 'white', borderRadius: '16px', padding: '2.5rem', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#111827', borderBottom: '2px solid #F3F4F6', paddingBottom: '1rem' }}>선생님용 성적표 입력 대시보드</h2>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem', backgroundColor: '#F9FAFB', padding: '1.5rem', borderRadius: '12px' }}>
+                  <div>
+                     <label style={{display: 'block', fontSize: '0.9rem', color: '#6B7280', marginBottom: '0.4rem'}}>학생 이름</label>
+                     <div style={{ fontWeight: '600', fontSize: '1.1rem', color: '#111827'}}>{pStudent.name}</div>
+                  </div>
+                  <div>
+                     <label style={{display: 'block', fontSize: '0.9rem', color: '#6B7280', marginBottom: '0.4rem'}}>학교 및 학년</label>
+                     <div style={{ fontWeight: '600', fontSize: '1.1rem', color: '#111827'}}>{pStudent.school} {pStudent.grade}</div>
+                  </div>
+                  <div>
+                     <label style={{display: 'block', fontSize: '0.9rem', color: '#6B7280', marginBottom: '0.4rem'}}>시험 과목</label>
+                     <input type="text" value={reportData.subject} onChange={e => setReportData({...reportData, subject: e.target.value})} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #D1D5DB' }} />
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '320px' }}>
+                     <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#1F2937', paddingBottom: '0.5rem', borderBottom: '1px solid #E5E7EB' }}>교재별 학습 달성률</h3>
+                     {renderRangeInput('백발백중', reportData.books.baekbal, v => setReportData({...reportData, books: {...reportData.books, baekbal: v}}))}
+                     {renderRangeInput('내신콘서트', reportData.books.naesin, v => setReportData({...reportData, books: {...reportData.books, naesin: v}}))}
+                     {renderRangeInput('exam4you', reportData.books.exam4you, v => setReportData({...reportData, books: {...reportData.books, exam4you: v}}))}
+                     {renderRangeInput('족보', reportData.books.jokbo, v => setReportData({...reportData, books: {...reportData.books, jokbo: v}}))}
+                     
+                     <div style={{ marginTop: '2.5rem', backgroundColor: '#EFF6FF', padding: '1.5rem', borderRadius: '12px', border: '1px solid #BFDBFE' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <span style={{ fontWeight: 'bold', color: '#1E3A8A' }}>동년배 대비 문제 풀이 속도</span>
+                           <div title="시스템 자동 산출 (1:매우 느림 ~ 5:평균 ~ 10:매우 빠름)" style={{ backgroundColor: '#DBEAFE', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 'bold', color: '#1E40AF', cursor: 'help' }}>
+                             자동 산출: {speedScore} / 10
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: '320px' }}>
+                     <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#1F2937', paddingBottom: '0.5rem', borderBottom: '1px solid #E5E7EB' }}>세부 영역별 성취도 및 태도</h3>
+                     {renderRangeInput('어휘', reportData.achieve.vocab, v => setReportData({...reportData, achieve: {...reportData.achieve, vocab: v}}))}
+                     {renderRangeInput('핵심 문법', reportData.achieve.grammar, v => setReportData({...reportData, achieve: {...reportData.achieve, grammar: v}}))}
+                     {renderRangeInput('본문분석 및 암기', reportData.achieve.analysis, v => setReportData({...reportData, achieve: {...reportData.achieve, analysis: v}}))}
+                     {renderRangeInput('서술형 영작', reportData.achieve.writing, v => setReportData({...reportData, achieve: {...reportData.achieve, writing: v}}))}
+                     {renderRangeInput('내신기간 성실도', reportData.achieve.sincerity, v => setReportData({...reportData, achieve: {...reportData.achieve, sincerity: v}}))}
+                  </div>
+                </div>
+                
+                <div style={{ marginTop: '3rem' }}>
+                   <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1rem', color: '#1F2937' }}>담당 강사 종합 피드백</h3>
+                   <textarea 
+                      style={{ width: '100%', minHeight: '130px', padding: '1rem', borderRadius: '8px', border: '1px solid #D1D5DB', fontSize: '1rem', resize: 'vertical' }}
+                      placeholder="이번 시험 대비에 대한 총평과 향후 정규 수업에서의 학습 방향을 작성해 주세요."
+                      value={reportData.comment}
+                      onChange={e => setReportData({...reportData, comment: e.target.value})}
+                   />
+                </div>
+                
+                <div style={{ marginTop: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                   <div style={{ display: 'flex', gap: '0.8rem' }}>
+                      <button className="btn" style={{ fontSize: '0.9rem', padding: '0.6rem 1rem' }} onClick={() => {
+                        const el = printRef.current;
+                        if (!el) return;
+                        el.style.display = 'block';
+                        html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
+                          el.style.display = 'none';
+                          const link = document.createElement('a');
+                          link.download = `내신성적표_${pStudent.name}.png`;
+                          link.href = canvas.toDataURL('image/png');
+                          link.click();
+                        }).catch(() => { el.style.display = 'none'; });
+                      }}>📷 이미지 다운로드</button>
+                      <button className="btn" style={{ fontSize: '0.9rem', padding: '0.6rem 1rem' }} onClick={() => {
+                        const encodedData = btoa(encodeURIComponent(JSON.stringify(reportData)));
+                        const url = `${window.location.origin}${window.location.pathname}?report=${printStudentId}&data=${encodedData}`;
+                        navigator.clipboard.writeText(url).then(() => {
+                          setLinkCopied(true);
+                          setTimeout(() => setLinkCopied(false), 2000);
+                        });
+                      }}>{linkCopied ? '✅ 복사됨!' : '🔗 링크 복사'}</button>
+                   </div>
+                   <div style={{ display: 'flex', gap: '0.8rem' }}>
+                      <button className="btn" style={{ padding: '0.6rem 1.5rem', backgroundColor: '#F3F4F6', color: '#374151', borderRadius: '8px', fontWeight: '600', border: 'none' }} onClick={() => setPrintStudentId(null)}>취소</button>
+                      <button className="btn" style={{ padding: '0.6rem 1.5rem', backgroundColor: '#2563EB', color: 'white', borderRadius: '8px', fontWeight: '600', border: 'none' }} onClick={() => window.print()}>🖨️ 인쇄 및 PDF 저장</button>
+                   </div>
+                </div>
               </div>
            </div>
          );
@@ -2067,44 +2223,8 @@ function App() {
            if (!pStudent) return null;
            const myProgress = calculateStudentProgress(pStudent).overallPct;
            const gradeAvg = getGradeAverageProgress(pStudent.grade);
-           return (
-             <div style={{ color: 'black', fontFamily: '-apple-system, sans-serif' }}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid black', paddingBottom: '10px' }}>
-                   <h1 style={{ fontSize: '28px', margin: 0 }}>내신대비 결과 보고서</h1>
-                   <span style={{ fontSize: '18px', display: 'flex', alignItems: 'flex-end' }}>{pStudent.school} {pStudent.grade}</span>
-                 </div>
-                 
-                 <div style={{ marginTop: '20px', fontSize: '20px' }}>
-                   <strong>이름:</strong> <span style={{ fontSize: '24px'}}>{pStudent.name}</span> {pStudent.studentClass && `(${pStudent.studentClass})`}
-                 </div>
-                 
-                 <div style={{ marginTop: '30px', display: 'flex', gap: '20px' }}>
-                   <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
-                     <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>전체 과정 달성률</h3>
-                     <div style={{ fontSize: '40px', fontWeight: 'bold', color: '#007AFF' }}>{myProgress}%</div>
-                     <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
-                       (동학년 평균 대비: {myProgress >= gradeAvg ? '+' : ''}{myProgress - gradeAvg}%)
-                     </div>
-                   </div>
-                   
-                   <div style={{ flex: 1, border: '1px solid #ddd', padding: '20px', borderRadius: '12px' }}>
-                     <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#555' }}>학습 참여 속도 및 성실도</h3>
-                     <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#34C759', marginTop: '10px' }}>{printSpeed}</div>
-                   </div>
-                 </div>
-
-                 <div style={{ marginTop: '30px', border: '1px solid #ddd', padding: '25px', minHeight: '300px', borderRadius: '12px' }}>
-                   <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #eee', paddingBottom: '10px', fontSize: '20px' }}>Tutors' Comment</h3>
-                   <div style={{ fontSize: '18px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
-                     {printComment || '이번 시험 대비를 위해 열심히 공부하고 있습니다!'}
-                   </div>
-                 </div>
-                 
-                 <div style={{ marginTop: '60px', textAlign: 'center', color: '#888', fontSize: '14px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-                   윌그로우 내신대비 마스터 시스템
-                 </div>
-             </div>
-           );
+           const pSpeedScore = getSolvingSpeedScore(pStudent.id);
+           return renderPrintableReport(pStudent, reportData, pSpeedScore, myProgress, gradeAvg);
         })()}
       </div>
 

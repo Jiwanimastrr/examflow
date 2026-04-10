@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.container {
+  width: 400px;
+  height: 300px;
+  overflow: auto;
+  border: 1px solid black;
+}
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 800px;
+}
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+th {
+  background: lightblue;
+  border-bottom: 1px solid black;
+  border-right: 1px solid black;
+  padding: 10px;
+}
+th.sticky-col {
+  position: sticky;
+  left: 0;
+  background: pink;
+  z-index: 20;
+}
+td.sticky-col {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 5;
+  border-right: 1px solid black;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2" class="sticky-col">Name</th>
+        <th colspan="2">Category 1 (very very long text here)</th>
+        <th colspan="2">Category 2</th>
+      </tr>
+      <tr>
+        <th>Task 1</th>
+        <th>Task 2</th>
+        <th>Task 3</th>
+        <th>Task 4</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="sticky-col">Alice</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td class="sticky-col">Bob</td><td>1</td><td>2</td><td>3</td><td>4</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
