@@ -1289,6 +1289,17 @@ function App() {
       </div>
     );
 
+    const ddayText = calculateDDay(student.school, student.grade);
+    const areaScores = [
+      { name: '어휘', v: reportState.achieve.vocab },
+      { name: '핵심 문법', v: reportState.achieve.grammar },
+      { name: '본문 분석·암기', v: reportState.achieve.analysis },
+      { name: '서술형 영작', v: reportState.achieve.writing },
+    ];
+    const sortedAreas = [...areaScores].sort((a, b) => b.v - a.v);
+    const strengths = sortedAreas.filter(a => a.v >= 7).slice(0, 2).map(a => a.name);
+    const improves = sortedAreas.filter(a => a.v <= 5).slice(-2).reverse().map(a => a.name);
+
     return (
       <div style={{ maxWidth: '850px', margin: '0 auto', padding: '50px 40px', backgroundColor: 'white', color: 'black', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #1F2937', paddingBottom: '20px' }}>
@@ -1299,9 +1310,18 @@ function App() {
              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                 <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#1F2937' }}>{student.school} {student.grade}</span>
                 <span style={{ fontSize: '18px', color: '#4B5563', marginTop: '4px' }}>{student.name} {student.studentClass && `(${student.studentClass})`}</span>
+                {ddayText && <span style={{ fontSize: '14px', color: ddayText === '시험 종료' ? '#94A3B8' : '#DC2626', marginTop: '6px', fontWeight: 700 }}>🗓️ {ddayText}</span>}
              </div>
           </div>
           
+          {(strengths.length > 0 || improves.length > 0) && (
+            <div style={{ marginTop: '28px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '14px', padding: '18px 22px', display: 'flex', flexWrap: 'wrap', gap: '10px 28px', alignItems: 'center', fontSize: '15px' }}>
+              <span style={{ fontWeight: 800, color: '#1E3A8A' }}>💡 학부모 한눈에 보기</span>
+              {strengths.length > 0 && <span style={{ color: '#065F46' }}>👍 강점: <strong>{strengths.join(' · ')}</strong></span>}
+              {improves.length > 0 && <span style={{ color: '#9A3412' }}>📌 우선 보완: <strong>{improves.join(' · ')}</strong></span>}
+            </div>
+          )}
+
           <div style={{ marginTop: '35px', display: 'flex', gap: '25px' }}>
              <div style={{ flex: 1, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '30px', borderRadius: '16px' }}>
                 <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#64748B', fontWeight: '600' }}>종합 달성률</h3>
