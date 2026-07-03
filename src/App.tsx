@@ -268,6 +268,324 @@ function App() {
     }
   };
 
+  const getMaterialProgressPct = (student: Student, materialTitle: string) => {
+    const material = ALL_MATERIALS.find(m => m.title === materialTitle);
+    if (!material) return 0;
+    
+    const assignedKeys = getAllPossibleAssignedItems(student);
+    const materialItemIds = material.categories.flatMap(cat => cat.items).map(i => i.id);
+    
+    const materialAssignedKeys = assignedKeys.filter(key => {
+      const match = key.match(/^(.+)_(.+)$/);
+      if (!match) return false;
+      const [, , itemId] = match;
+      return materialItemIds.includes(itemId);
+    });
+    
+    const totalInMaterial = materialAssignedKeys.length;
+    if (totalInMaterial === 0) return 0;
+    
+    let completedInMaterial = 0;
+    materialAssignedKeys.forEach(key => {
+      const match = key.match(/^(.+)_(.+)$/);
+      if (match) {
+        const [, lesson, itemId] = match;
+        if (getStudentProgressState(student, lesson, itemId).isChecked) {
+          completedInMaterial++;
+        }
+      }
+    });
+    
+    return Math.round((completedInMaterial / totalInMaterial) * 100);
+  };
+
+  const openPrintReportModal = (student: Student) => {
+    const baekbalPct = getMaterialProgressPct(student, "백발백중");
+    const naesinPct = getMaterialProgressPct(student, "내신콘서트");
+    const exam4youPct = getMaterialProgressPct(student, "exam4you");
+    const jokboPct = getMaterialProgressPct(student, "족보");
+
+    const baekbalScore = Math.round(baekbalPct / 10);
+    const naesinScore = Math.round(naesinPct / 10);
+    const exam4youScore = Math.round(exam4youPct / 10);
+    const jokboScore = Math.round(jokboPct / 10);
+
+    const calculateCategoryScore = (keywords: string[]) => {
+      const assignedKeys = getAllPossibleAssignedItems(student);
+      const matchedKeys = assignedKeys.filter(key => {
+        const match = key.match(/^(.+)_(.+)$/);
+        if (!match) return false;
+        const [, , itemId] = match;
+        const lowerId = itemId.toLowerCase();
+        const itemLabel = ALL_CHECKLIST_ITEMS.find(i => i.id === itemId)?.label.toLowerCase() || '';
+        return keywords.some(kw => lowerId.includes(kw) || itemLabel.includes(kw));
+      });
+      if (matchedKeys.length === 0) return 5;
+      let completed = 0;
+      matchedKeys.forEach(key => {
+        const match = key.match(/^(.+)_(.+)$/);
+        if (match) {
+          const [, lesson, itemId] = match;
+          if (getStudentProgressState(student, lesson, itemId).isChecked) completed++;
+        }
+      });
+      return Math.round((completed / matchedKeys.length) * 10);
+    };
+
+    const vocabScore = calculateCategoryScore(['vocab', 'word', '뜻', '영어시험']);
+    const grammarScore = calculateCategoryScore(['grammar', '문법', '어법']);
+    const analysisScore = calculateCategoryScore(['read', '본문', 'textbook', 'content', '해석']);
+    const writingScore = calculateCategoryScore(['essay', 'writing', '영작', '서술형']);
+    
+    const progress = calculateStudentProgress(student);
+    const sincerityScore = Math.round(progress.overallPct / 10);
+
+    setPrintStudentId(student.id);
+    setReportData({
+      subject: '영어',
+      books: {
+        baekbal: baekbalScore,
+        naesin: naesinScore,
+        exam4you: exam4youScore,
+        jokbo: jokboScore
+      },
+      achieve: {
+        vocab: vocabScore,
+        grammar: grammarScore,
+        analysis: analysisScore,
+        writing: writingScore,
+        sincerity: sincerityScore
+      },
+      comment: student.comments && student.comments.length > 0
+        ? [...student.comments].sort((a, b) => b.timestamp - a.timestamp)[0].text
+        : ''
+    });
+  };
+
+  const escapeCSV = (val: any) => {
+    if (val === undefined || val === null) return '';
+    const str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const downloadCSV = (csvContent: string, filename: string) => {
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadAllStudentsCSV = () => {
+    const headers = [
+      "이름", "학교", "학년", "반", "시험 D-Day", 
+      "전체 과정 달성률", 
+      "백발백중 달성률", 
+      "내신콘서트 달성률", 
+      "백발백중 부록 X10 달성률", 
+      "exam4you 달성률", 
+      "족보 달성률", 
+      `${activeMaterialId} 달성률(선택탭)`, 
+      "최근 피드백 코멘트"
+    ];
+    
+    const rows = filteredStudents.map(student => {
+      const progress = calculateStudentProgress(student);
+      const dDay = calculateDDay(student.school, student.grade) || '';
+      
+      const baekbalPct = getMaterialProgressPct(student, "백발백중");
+      const naesinPct = getMaterialProgressPct(student, "내신콘서트");
+      const baekbalX10Pct = getMaterialProgressPct(student, "백발백중 부록 X10");
+      const exam4youPct = getMaterialProgressPct(student, "exam4you");
+      const jokboPct = getMaterialProgressPct(student, "족보");
+
+      let lastComment = '';
+      if (student.comments && student.comments.length > 0) {
+        const sortedComments = [...student.comments].sort((a, b) => b.timestamp - a.timestamp);
+        lastComment = `${sortedComments[0].author}: ${sortedComments[0].text}`;
+      }
+      
+      return [
+        student.name,
+        student.school,
+        student.grade,
+        student.studentClass || '',
+        dDay,
+        `${progress.overallPct}%`,
+        `${baekbalPct}%`,
+        `${naesinPct}%`,
+        `${baekbalX10Pct}%`,
+        `${exam4youPct}%`,
+        `${jokboPct}%`,
+        `${progress.currentMaterialPct}%`,
+        lastComment
+      ];
+    });
+    
+    const csvContent = [
+      headers.map(escapeCSV).join(','),
+      ...rows.map(row => row.map(escapeCSV).join(','))
+    ].join('\n');
+    
+    const today = new Date().toISOString().split('T')[0];
+    downloadCSV(csvContent, `내신대비_전체학생현황_${today}.csv`);
+    logActivity(currentUser, "전체 학생 현황 CSV 다운로드");
+  };
+
+  const handleDownloadSingleStudentCSV = (student: Student) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    let csvContent = "";
+    
+    // 1. Student basic info
+    csvContent += `[학생 기본 정보]\n`;
+    csvContent += `이름,${escapeCSV(student.name)}\n`;
+    csvContent += `학교/학년/반,${escapeCSV(`${student.school} ${student.grade} ${student.studentClass || ''}`)}\n`;
+    const dDay = calculateDDay(student.school, student.grade) || '';
+    csvContent += `시험 D-Day,${escapeCSV(dDay)}\n`;
+    
+    const progress = calculateStudentProgress(student);
+    csvContent += `전체 과정 총 달성률,${progress.overallPct}%\n`;
+    
+    // 교재별 달성률
+    const baekbalPct = getMaterialProgressPct(student, "백발백중");
+    const naesinPct = getMaterialProgressPct(student, "내신콘서트");
+    const baekbalX10Pct = getMaterialProgressPct(student, "백발백중 부록 X10");
+    const exam4youPct = getMaterialProgressPct(student, "exam4you");
+    const jokboPct = getMaterialProgressPct(student, "족보");
+    
+    csvContent += `백발백중 달성률,${baekbalPct}%\n`;
+    csvContent += `내신콘서트 달성률,${naesinPct}%\n`;
+    csvContent += `백발백중 부록 X10 달성률,${baekbalX10Pct}%\n`;
+    csvContent += `exam4you 달성률,${exam4youPct}%\n`;
+    csvContent += `족보 달성률,${jokboPct}%\n`;
+    csvContent += `\n`;
+    
+    // 2. Checklist details
+    csvContent += `[세부 학습 달성도]\n`;
+    csvContent += `교재명,단원(Lesson),영역(Category),세부 항목,배정 여부,완료 여부,완료 일시,확인 강사\n`;
+    
+    ALL_MATERIALS.forEach(material => {
+      LESSONS.forEach(lesson => {
+        material.categories.forEach(category => {
+          category.items.forEach(item => {
+            const assigned = isItemAssigned(student, lesson, item.id);
+            if (!assigned) return;
+            
+            const progressState = getStudentProgressState(student, lesson, item.id);
+            const isChecked = progressState.isChecked;
+            
+            let completedAtStr = '';
+            let updatedByStr = '';
+            
+            const data = progressState.data;
+            if (data && typeof data === 'object') {
+              if (data.updatedAt) {
+                completedAtStr = new Date(data.updatedAt).toLocaleString();
+              }
+              if (data.updatedBy) {
+                updatedByStr = data.updatedBy;
+              }
+            }
+            
+            csvContent += `${escapeCSV(material.title)},${escapeCSV(lesson)},${escapeCSV(category.title)},${escapeCSV(item.label)},배정,${isChecked ? '완료' : '미완료'},${escapeCSV(completedAtStr)},${escapeCSV(updatedByStr)}\n`;
+          });
+        });
+      });
+    });
+    
+    csvContent += `\n`;
+    
+    // 3. Comments history
+    csvContent += `[교사 피드백 히스토리]\n`;
+    csvContent += `작성 일시,작성자,피드백 내용\n`;
+    
+    if (student.comments && student.comments.length > 0) {
+      const sortedComments = [...student.comments].sort((a, b) => a.timestamp - b.timestamp);
+      sortedComments.forEach(comment => {
+        const dateStr = new Date(comment.timestamp).toLocaleString();
+        csvContent += `${escapeCSV(dateStr)},${escapeCSV(comment.author)},${escapeCSV(comment.text)}\n`;
+      });
+    } else {
+      csvContent += `,,등록된 피드백이 없습니다.\n`;
+    }
+    
+    downloadCSV(csvContent, `${student.name}_내신대비_상세포트폴리오_${today}.csv`);
+    logActivity(currentUser, `학생 '${student.name}' 상세 CSV 포트폴리오 다운로드`);
+  };
+
+  const handleDownloadIntegratedPortfolioCSV = () => {
+    const today = new Date().toISOString().split('T')[0];
+    let csvContent = "";
+    
+    // 1. Integrated checklist completion details
+    csvContent += `[통합 세부 학습 달성도]\n`;
+    csvContent += `학생 이름,학교,학년,반,교재명,단원(Lesson),영역(Category),세부 항목,배정 여부,완료 여부,완료 일시,확인 강사\n`;
+    
+    filteredStudents.forEach(student => {
+      ALL_MATERIALS.forEach(material => {
+        LESSONS.forEach(lesson => {
+          material.categories.forEach(category => {
+            category.items.forEach(item => {
+              const assigned = isItemAssigned(student, lesson, item.id);
+              if (!assigned) return;
+              
+              const progressState = getStudentProgressState(student, lesson, item.id);
+              const isChecked = progressState.isChecked;
+              
+              let completedAtStr = '';
+              let updatedByStr = '';
+              
+              const data = progressState.data;
+              if (data && typeof data === 'object') {
+                if (data.updatedAt) {
+                  completedAtStr = new Date(data.updatedAt).toLocaleString();
+                }
+                if (data.updatedBy) {
+                  updatedByStr = data.updatedBy;
+                }
+              }
+              
+              csvContent += `${escapeCSV(student.name)},${escapeCSV(student.school)},${escapeCSV(student.grade)},${escapeCSV(student.studentClass || '')},${escapeCSV(material.title)},${escapeCSV(lesson)},${escapeCSV(category.title)},${escapeCSV(item.label)},배정,${isChecked ? '완료' : '미완료'},${escapeCSV(completedAtStr)},${escapeCSV(updatedByStr)}\n`;
+            });
+          });
+        });
+      });
+    });
+    
+    csvContent += `\n\n`;
+    
+    // 2. Integrated comments history
+    csvContent += `[통합 교사 피드백 히스토리]\n`;
+    csvContent += `학생 이름,학교,학년,반,작성 일시,작성자,피드백 내용\n`;
+    
+    let hasAnyComment = false;
+    filteredStudents.forEach(student => {
+      if (student.comments && student.comments.length > 0) {
+        hasAnyComment = true;
+        const sortedComments = [...student.comments].sort((a, b) => a.timestamp - b.timestamp);
+        sortedComments.forEach(comment => {
+          const dateStr = new Date(comment.timestamp).toLocaleString();
+          csvContent += `${escapeCSV(student.name)},${escapeCSV(student.school)},${escapeCSV(student.grade)},${escapeCSV(student.studentClass || '')},${escapeCSV(dateStr)},${escapeCSV(comment.author)},${escapeCSV(comment.text)}\n`;
+        });
+      }
+    });
+    
+    if (!hasAnyComment) {
+      csvContent += `,,,,,,등록된 피드백이 없습니다.\n`;
+    }
+    
+    downloadCSV(csvContent, `내신대비_상세포트폴리오_통합_${today}.csv`);
+    logActivity(currentUser, `필터링된 학생 ${filteredStudents.length}명 상세 포트폴리오 통합 CSV 다운로드`);
+  };
+
   const handleBulkAddStudents = async () => {
     if (!bulkAddInput.trim()) return;
     
@@ -491,6 +809,28 @@ function App() {
       } catch (e) {
         console.error("Fallback failed:", e);
       }
+    }
+  };
+
+  const bulkToggleCurrentTab = async (student: Student) => {
+    const material = ALL_MATERIALS.find(m => m.title === activeMaterialId);
+    if (!material) return;
+    const itemIds = material.categories.flatMap(c => c.items).map(i => i.id)
+      .filter(id => isItemAssigned(student, activeLesson, id));
+    if (itemIds.length === 0) { alert('현재 탭에 배정된 항목이 없습니다.'); return; }
+    const allChecked = itemIds.every(id => getStudentProgressState(student, activeLesson, id).isChecked);
+    const target = !allChecked;
+    const verb = target ? '전체 완료 처리' : '전체 해제';
+    if (!confirm(`${student.name} 학생의 [${activeMaterialId} / ${activeLesson}] 배정 항목 ${itemIds.length}개를 ${verb}하시겠습니까?`)) return;
+    const now = Date.now();
+    const update: Record<string, any> = {};
+    itemIds.forEach(id => { update[`progress.${activeLesson}_${id}`] = { isChecked: target, updatedBy: currentUser, updatedAt: now }; });
+    try {
+      await updateDoc(doc(db, 'students', student.id), update);
+      logActivity(currentUser, `학생 '${student.name}'의 [${activeMaterialId} ${activeLesson}] 배정항목 ${itemIds.length}개 ${verb}`);
+    } catch (e) {
+      console.error('bulk toggle failed', e);
+      alert('일괄 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -825,6 +1165,19 @@ function App() {
 
     if (diffDays > 0) return `D-${diffDays}`;
     return `시험 종료`;
+  };
+
+  const getRiskLevel = (student: Student) => {
+    const dday = calculateDDay(student.school, student.grade);
+    if (!dday || dday === '시험 종료') return null;
+    const pct = calculateStudentProgress(student).overallPct;
+    let days: number | null = null;
+    if (dday.startsWith('시험 기간')) days = 0;
+    else { const mm = dday.match(/D-(\d+)/); days = mm ? parseInt(mm[1], 10) : null; }
+    if (days === null) return null;
+    if (days <= 14 && pct < 60) return { level: 'red', badge: '🔴 위험', bg: '#e5484d', color: 'white', title: `시험 임박(D-${days}) · 전체 달성률 ${pct}%` };
+    if ((days <= 14 && pct < 80) || (days <= 30 && pct < 50)) return { level: 'yellow', badge: '🟡 주의', bg: '#f5a623', color: '#3a2a00', title: `시험 D-${days} · 전체 달성률 ${pct}%` };
+    return { level: 'green', badge: '🟢 양호', bg: '#2e7d32', color: 'white', title: `시험 D-${days} · 전체 달성률 ${pct}%` };
   };
 
   const formatDate = (timestamp: number) => {
@@ -1228,7 +1581,43 @@ function App() {
         )}
 
         {filteredStudents.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <button
+              onClick={handleDownloadAllStudentsCSV}
+              className="btn"
+              style={{ 
+                padding: '0.4rem 0.8rem', 
+                fontSize: '0.85rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.4rem', 
+                backgroundColor: 'var(--accent-blue)', 
+                color: 'white', 
+                border: 'none',
+                boxShadow: '0 2px 4px rgba(33, 150, 243, 0.2)'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              엑셀(CSV) 다운로드
+            </button>
+            <button
+              onClick={handleDownloadIntegratedPortfolioCSV}
+              className="btn"
+              style={{ 
+                padding: '0.4rem 0.8rem', 
+                fontSize: '0.85rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.4rem', 
+                backgroundColor: '#673ab7', 
+                color: 'white', 
+                border: 'none',
+                boxShadow: '0 2px 4px rgba(103, 58, 183, 0.2)'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              상세 포트폴리오 통합 다운로드
+            </button>
             <button 
               onClick={() => setIsTableFullScreen(true)}
               className="btn"
@@ -1312,11 +1701,27 @@ function App() {
                               style={{ fontSize: '0.8rem', cursor: 'pointer', marginLeft: '0.3rem' }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPrintStudentId(student.id);
-                                setReportData(defaultReportData);
+                                openPrintReportModal(student);
                               }}
                               title="결과지 인쇄/옵션보기"
                             >🖨️</span>
+                            <span 
+                              style={{ fontSize: '0.8rem', cursor: 'pointer', marginLeft: '0.3rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadSingleStudentCSV(student);
+                              }}
+                              title="상세 CSV 포트폴리오 다운로드"
+                            >📥</span>
+                            <span
+                              style={{ fontSize: '0.8rem', cursor: 'pointer', marginLeft: '0.3rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                bulkToggleCurrentTab(student);
+                              }}
+                              title="현재 탭의 배정 항목 전체 체크/해제"
+                            >✅</span>
+                            {(() => { const r = getRiskLevel(student); return (r && (r.level === 'red' || r.level === 'yellow')) ? <span title={r.title} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: r.bg, color: r.color, fontWeight: 700, cursor: 'default', marginLeft: '0.3rem' }}>{r.badge}</span> : null; })()}
                             {dDayText && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '12px', backgroundColor: dDayText === '시험 종료' ? 'var(--bg-secondary)' : 'var(--accent-red)', color: dDayText === '시험 종료' ? 'var(--text-secondary)' : 'white', cursor: 'default', marginLeft: '0.3rem' }}>{dDayText}</span>}
                           </span>
                           
