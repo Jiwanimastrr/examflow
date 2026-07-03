@@ -1255,6 +1255,24 @@ function App() {
   // we can just reverse, but normally we just take the last 3 or sort ascending.
   const sortedByProgressAsc = [...studentsWithProgress].sort((a, b) => a.progressData.currentMaterialPct - b.progressData.currentMaterialPct);
   const bottom3Students = sortedByProgressAsc.slice(0, 3);
+  const riskSummary = (() => {
+    let red = 0, yellow = 0, green = 0;
+    const atRisk: { student: Student; level: string; days: number; pct: number }[] = [];
+    filteredStudents.forEach(s => {
+      const r = getRiskLevel(s);
+      if (!r) return;
+      if (r.level === 'red') red++; else if (r.level === 'yellow') yellow++; else green++;
+      if (r.level === 'red' || r.level === 'yellow') {
+        const dd = calculateDDay(s.school, s.grade) || '';
+        const mm = dd.match(/D-(\d+)/);
+        const days = dd.startsWith('시험 기간') ? 0 : (mm ? parseInt(mm[1], 10) : 999);
+        atRisk.push({ student: s, level: r.level, days, pct: calculateStudentProgress(s).overallPct });
+      }
+    });
+    atRisk.sort((a, b) => (a.level === b.level ? (a.days - b.days || a.pct - b.pct) : (a.level === 'red' ? -1 : 1)));
+    const avg = filteredStudents.length ? Math.round(filteredStudents.reduce((sum, s) => sum + calculateStudentProgress(s).overallPct, 0) / filteredStudents.length) : 0;
+    return { red, yellow, green, avg, atRisk: atRisk.slice(0, 5) };
+  })();
 
   // --- 결과지 전용 레이아웃 헬퍼 함수 ---
   const renderPrintableReport = (student: Student, reportState: typeof reportData, speedScore: number, progressPct: number, gradeAvg: number) => {
@@ -1547,6 +1565,34 @@ function App() {
           ))}
         </div>
 
+        {/* 시험 대비 요약 바 + 이번 주 챙길 학생 */}
+        {filteredStudents.length > 0 && (
+          <div style={{ marginBottom: '1.5rem', padding: '0.9rem 1.1rem', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem 1.2rem', fontSize: '0.9rem' }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>📊 시험 대비 현황</span>
+              <span style={{ color: 'var(--text-secondary)' }}>전체 평균 달성률 <strong style={{ color: 'var(--text-primary)' }}>{riskSummary.avg}%</strong></span>
+              <span style={{ color: '#c62828' }}>🔴 위험 <strong>{riskSummary.red}</strong></span>
+              <span style={{ color: '#b8860b' }}>🟡 주의 <strong>{riskSummary.yellow}</strong></span>
+              <span style={{ color: '#2e7d32' }}>🟢 양호 <strong>{riskSummary.green}</strong></span>
+            </div>
+            {riskSummary.atRisk.length > 0 && (
+              <div style={{ marginTop: '0.7rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginRight: '0.2rem' }}>이번 주 챙길 학생:</span>
+                {riskSummary.atRisk.map(a => (
+                  <button
+                    key={a.student.id}
+                    onClick={() => { const el = document.getElementById(`row-${a.student.id}`); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.transition = 'background-color 0.3s'; el.style.backgroundColor = 'rgba(245,166,35,0.35)'; setTimeout(() => { el.style.backgroundColor = ''; }, 1600); } }}
+                    title={`${a.student.school} ${a.student.grade}${a.student.studentClass ? (' ' + a.student.studentClass) : ''} · D-${a.days} · 전체 달성률 ${a.pct}%`}
+                    style={{ cursor: 'pointer', border: 'none', borderRadius: '16px', padding: '3px 10px', fontSize: '0.82rem', fontWeight: 600, color: a.level === 'red' ? 'white' : '#3a2a00', background: a.level === 'red' ? '#e5484d' : '#f5a623' }}
+                  >
+                    {a.level === 'red' ? '🔴' : '🟡'} {a.student.name} · {a.pct}%
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Ranking Dashboard */}
         {filteredStudents.length > 0 && (
           <div className="flex-mobile-col" style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
@@ -1673,7 +1719,7 @@ function App() {
                   const dDayText = calculateDDay(student.school, student.grade);
                   
                   return (
-                    <tr key={student.id}>
+                    <tr key={student.id} id={`row-${student.id}`}>
                       <td className="student-name-col">
                         <div className="flex flex-col gap-1">
                           <span 
